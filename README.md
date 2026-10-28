@@ -1,0 +1,145 @@
+# Gerador de Prompts — Robô de Prompts
+
+Site de gerador de prompts em formato de **conversa**: o usuário descreve o que quer
+(foto, vídeo, edição de foto ou edição de vídeo), o assistente lembra da conversa
+**inteira** e refina o prompt a cada resposta, sem repetir modelos genéricos.
+O usuário pode pedir o prompt final a qualquer momento e recebe a versão em
+português **e** em inglês, com botões de copiar.
+
+Modelo de negócio (v1): assinatura com pagamento avulso por período via **Pix
+(Mercado Pago)** — sem débito automático.
+- **Teste:** R$ 1,99 = 1 dia de acesso (só pode ser usado uma vez por conta).
+- **Mensal:** R$ 19,90 = 30 dias de acesso (o botão de renovar paga de novo e
+  estende 30 dias a partir do vencimento atual).
+
+Repositório: **https://github.com/luisdaroca100-a11y/Promptprofissional**
+
+Arquitetura: frontend estático (`index.html` + `app.js` + `styles.css`, sem
+build) + funções serverless Node na Vercel (`api/`). O navegador fala SOMENTE
+com `/api/*` e com o Supabase Auth — a chave do Gemini e o token do Mercado
+Pago ficam **só no servidor**, lidos de variáveis de ambiente. Nenhuma chave
+está no código.
+
+## Estrutura
+
+```
+index.html                 Frontend: login, chat, planos/Pix
+styles.css                 Tema escuro profissional, acento dourado
+app.js                     Lógica do chat, conversas, pagamento Pix
+api/_lib.js                Helpers (Supabase REST, auth, acesso, uso)
+api/config.js              Config pública (URL + anon key do Supabase)
+api/me.js                  Usuário atual + acesso + uso do dia
+api/chat.js                Proxy do Gemini (memória total da conversa)
+api/mp-create-payment.js   Cria Pix + verifica pagamento já feito
+api/mp-webhook.js          Webhook do Mercado Pago (libera acesso)
+supabase.sql               Schema completo (tabelas + RLS + trigger)
+README.md                  Este arquivo
+```
+
+## 1. Banco de dados (Supabase)
+
+O projeto Supabase já existe. Rode o arquivo `supabase.sql` inteiro no
+**SQL Editor** do projeto (Dashboard > SQL Editor > New query > colar > Run).
+
+Ele cria: `profiles`, `user_access`, `usage`, `conversations`, `messages`,
+`processed_payments`, com RLS ativado (cada usuário só vê os próprios dados)
+e um trigger que cria o perfil ao cadastrar.
+
+> Em **Authentication > Providers**, deixe o provedor **Email** ativado.
+> Em **Authentication > URL Configuration**, ajuste o **Site URL** para o
+> domínio final do site na Vercel (ex.: `https://promptprofissional.vercel.app`).
+
+## 2. Chave do Gemini (Google AI Studio)
+
+1. Abra https://aistudio.google.com/apikey (conta Google do dono do site).
+2. Clique em **Create API key** e copie a chave.
+3. Ela será colada como variável de ambiente na Vercel (passo 4) — **nunca**
+   cole a chave no código, no chat ou no repositório.
+
+Modelo usado: `gemini-2.0-flash`. A cota gratuita do Gemini é compartilhada
+entre todos os usuários do site; se o volume crescer, ative o faturamento
+(billing) no Google Cloud do projeto da chave — o código não muda.
+
+## 3. Mercado Pago (Pix)
+
+1. Crie uma conta/“aplicação” no [Mercado Pago Developers](https://www.mercadopago.com.br/developers).
+2. Copie o **Access Token de produção** (começa com `APP_USR-`).
+   Use o token de **produção**, não o de teste, para cobrar de verdade.
+3. O código já envia `notification_url` apontando para o webhook do próprio
+   domínio ao criar cada pagamento. Mesmo assim, confira no painel do
+   Mercado Pago se o webhook está ativo; a URL final é:
+
+   ```
+   https://SEU-DOMINIO.vercel.app/api/mp-webhook
+   ```
+
+   Substitua `SEU-DOMINIO` pelo domínio real após o deploy.
+4. O token será colado como variável de ambiente na Vercel (passo 4).
+
+## 4. Deploy na Vercel (importar o repositório)
+
+1. Abra https://vercel.com/new e escolha **Import Git Repository**.
+2. Selecione o repositório **luisdaroca100-a11y/Promptprofissional**.
+3. Framework Preset: **Other** (não há build — é HTML + funções `api/`).
+4. Antes de clicar em **Deploy**, abra **Environment Variables** e adicione
+   exatamente estas variáveis (valores colados por você, nunca no código):
+
+   | Variável | Onde achar |
+   |---|---|
+   | `SUPABASE_URL` | Supabase > Settings > API > Project URL |
+   | `SUPABASE_ANON_KEY` | Supabase > Settings > API > anon public |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase > Settings > API > service_role (segredo — só no servidor) |
+   | `GEMINI_API_KEY` | Google AI Studio (passo 2) |
+   | `MP_ACCESS_TOKEN` | Mercado Pago Developers (passo 3) |
+
+5. Clique em **Deploy**. Pronto: o site estará no domínio `.vercel.app`
+   (ou no domínio próprio, se configurar um).
+
+> Depois de trocar qualquer variável de ambiente, faça **Redeploy**
+> (Deployments > ⋯ > Redeploy) para valer.
+
+## 5. Como testar (fluxo completo)
+
+1. Abra o site, crie uma conta com e-mail e senha.
+2. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
+   (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.
+3. Converse com o Robô de Prompts: descreva o que quer, responda às
+   perguntas dele e toque em **“✨ Gerar prompt final”** para ver o
+   prompt em PT + EN com botão de copiar.
+4. Feche e reabra o navegador: o histórico da conversa continua lá
+   (fica no banco, não só no aparelho).
+5. Para renovar, a tela de planos reaparece ao vencer — pague de novo
+   e o acesso estende 30 dias.
+
+## Limites e regras (v1)
+
+- **Limite diário:** 50 prompts por usuário/dia (constante `DAILY_LIMIT`
+  em `api/chat.js` e `api/me.js`). Ajuste o número nas duas constantes.
+- **Memória:** o backend envia o histórico completo da conversa ao Gemini
+  a cada turno (limitado às últimas 200 mensagens por conversa).
+- **Teste único:** cada conta só pode comprar o teste de R$ 1,99 uma vez
+  (verificado em `processed_payments`).
+- **Webhook idempotente:** notificações duplicadas do mesmo `payment_id`
+  são ignoradas.
+- **Sem débito automático:** cada período é um pagamento Pix avulso.
+
+## Premissas anotadas (API do Mercado Pago)
+
+- Criação de pagamento: `POST https://api.mercadopago.com/v1/payments`
+  com `payment_method_id: "pix"`, `transaction_amount`, `description`,
+  `payer.email`, `external_reference` (`userId:plano:timestamp`) e
+  `notification_url` — forma documentada da API REST do Mercado Pago.
+- O QR Code vem em
+  `point_of_interaction.transaction_data.qr_code_base64` e o copia e cola
+  em `qr_code`, conforme a resposta documentada da API.
+- A notificação do webhook traz `type: "payment"` + `data.id`; o servidor
+  sempre consulta o pagamento na API antes de liberar o acesso (não confia
+  só no corpo da notificação).
+
+## Segurança
+
+- As chaves `service_role`, `GEMINI_API_KEY` e `MP_ACCESS_TOKEN` só existem
+  como variáveis de ambiente no servidor. O frontend recebe, via
+  `/api/config`, apenas a URL e a anon key do Supabase (feitas para uso no
+  navegador e protegidas pelas políticas RLS).
+- Nunca faça commit de arquivos `.env` nem cole chaves no repositório.

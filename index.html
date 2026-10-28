@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gerador de Prompts — Robô de Prompts</title>
+<meta name="description" content="Converse com o Robô de Prompts e crie prompts profissionais para fotos, vídeos e edições. Ele lembra de toda a conversa e refina o prompt com você.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ TELA DE LOGIN / CADASTRO ============ -->
+<section id="authView" class="auth-view">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="robot-avatar robot-avatar-lg" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+          <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+          <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+          <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+        </svg>
+      </span>
+      <h1>Gerador de Prompts</h1>
+      <p class="auth-tagline">Converse com o <strong>Robô de Prompts</strong> e crie prompts profissionais para fotos, vídeos e edições. Ele lembra de toda a conversa e refina o prompt com você.</p>
+    </div>
+
+    <div class="auth-tabs" role="tablist">
+      <button id="tabLogin" class="auth-tab active" type="button">Entrar</button>
+      <button id="tabSignup" class="auth-tab" type="button">Criar conta</button>
+    </div>
+
+    <form id="authForm" novalidate>
+      <label class="field">
+        <span>E-mail</span>
+        <input id="authEmail" type="email" placeholder="seu@email.com" autocomplete="email" required>
+      </label>
+      <label class="field">
+        <span>Senha</span>
+        <input id="authPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="current-password" required minlength="6">
+      </label>
+      <p id="authError" class="form-error" role="alert" hidden></p>
+      <button id="authSubmit" class="btn btn-gold btn-block" type="submit">Entrar</button>
+    </form>
+
+    <p class="auth-note">Teste de 1 dia por <strong>R$ 1,99</strong> · Assinatura <strong>R$ 19,90/mês</strong> · Pagamento via Pix</p>
+  </div>
+</section>
+
+<!-- ============ TELA DE PLANOS / ACESSO ============ -->
+<section id="payView" class="pay-view" hidden>
+  <div class="pay-wrap">
+    <div class="pay-head">
+      <span class="robot-avatar" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+          <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+          <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+          <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+        </svg>
+      </span>
+      <div>
+        <h1>Ative seu acesso</h1>
+        <p id="payHello">Olá! Escolha um plano para conversar com o Robô de Prompts.</p>
+      </div>
+      <button id="payLogout" class="btn btn-ghost" type="button">Sair</button>
+    </div>
+
+    <div class="plan-grid">
+      <article class="plan-card">
+        <h2>Teste de 1 dia</h2>
+        <p class="plan-price">R$ 1,99</p>
+        <p class="plan-period">1 dia de acesso completo</p>
+        <ul>
+          <li>Conversa com memória total</li>
+          <li>Foto, vídeo e edições</li>
+          <li>Prompt final em PT + EN</li>
+        </ul>
+        <button class="btn btn-outline btn-block" type="button" data-plan="trial">Pagar com Pix — R$ 1,99</button>
+      </article>
+
+      <article class="plan-card plan-card-featured">
+        <span class="plan-badge">Mais escolhido</span>
+        <h2>Assinatura mensal</h2>
+        <p class="plan-price">R$ 19,90<span class="plan-per">/mês</span></p>
+        <p class="plan-period">30 dias de acesso completo</p>
+        <ul>
+          <li>Conversa com memória total</li>
+          <li>Foto, vídeo e edições</li>
+          <li>Prompt final em PT + EN</li>
+          <li>Renove quando quiser por mais 30 dias</li>
+        </ul>
+        <button class="btn btn-gold btn-block" type="button" data-plan="monthly">Pagar com Pix — R$ 19,90</button>
+      </article>
+    </div>
+    <p class="pay-note">Pagamento avulso por período via Pix. Sem débito automático: quando vencer, você renova se quiser.</p>
+
+    <div id="pixArea" class="pix-area" hidden>
+      <h2>Escaneie o QR Code com o app do seu banco</h2>
+      <img id="pixQr" alt="QR Code Pix" width="220" height="220">
+      <p class="pix-amount" id="pixAmount"></p>
+      <label class="field">
+        <span>Pix copia e cola</span>
+        <div class="copy-row">
+          <input id="pixCode" type="text" readonly>
+          <button id="pixCopy" class="btn btn-outline" type="button">Copiar</button>
+        </div>
+      </label>
+      <p id="pixStatus" class="pix-status">Aguardando pagamento…</p>
+      <button id="pixCheck" class="btn btn-gold btn-block" type="button">Já paguei, verificar</button>
+      <p id="pixError" class="form-error" role="alert" hidden></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP DE CHAT ============ -->
+<section id="appView" class="app-view" hidden>
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-top">
+      <span class="robot-avatar robot-avatar-sm" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+          <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+          <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+          <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+        </svg>
+      </span>
+      <strong class="sidebar-brand">Robô de Prompts</strong>
+      <button id="sidebarClose" class="btn btn-ghost icon-btn" type="button" aria-label="Fechar menu">✕</button>
+    </div>
+    <button id="newChatBtn" class="btn btn-gold btn-block" type="button">+ Nova conversa</button>
+    <nav id="conversationList" class="conversation-list" aria-label="Conversas"></nav>
+    <div class="sidebar-foot">
+      <p id="userEmailLabel" class="user-email"></p>
+      <p id="accessLabel" class="access-label"></p>
+      <p id="usageLabel" class="usage-label"></p>
+      <button id="logoutBtn" class="btn btn-ghost btn-block" type="button">Sair</button>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <!-- Cabeçalho do chat, estilo assistente de mensagens -->
+    <header class="chat-header">
+      <button id="sidebarOpen" class="btn btn-ghost icon-btn" type="button" aria-label="Abrir menu">☰</button>
+      <span class="robot-avatar" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+          <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+          <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+          <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+        </svg>
+      </span>
+      <div class="chat-identity">
+        <strong>Robô de Prompts</strong>
+        <span class="online-status"><span class="online-dot"></span>Online · lembra de toda a conversa</span>
+      </div>
+      <button id="finalPromptBtn" class="btn btn-gold" type="button">✨ Gerar prompt final</button>
+    </header>
+
+    <!-- Seletor de modo -->
+    <div class="mode-row" role="group" aria-label="Tipo de prompt">
+      <button class="mode-chip active" type="button" data-mode="foto">📷 Foto</button>
+      <button class="mode-chip" type="button" data-mode="video">🎬 Vídeo</button>
+      <button class="mode-chip" type="button" data-mode="edicao_foto">🖼️ Edição de foto</button>
+      <button class="mode-chip" type="button" data-mode="edicao_video">✂️ Edição de vídeo</button>
+    </div>
+
+    <!-- Painel do prompt final -->
+    <div id="finalPanel" class="final-panel" hidden>
+      <div class="final-panel-head">
+        <strong>Prompt final</strong>
+        <div class="final-tabs" role="tablist">
+          <button id="tabPt" class="final-tab active" type="button">Português</button>
+          <button id="tabEn" class="final-tab" type="button">English</button>
+        </div>
+        <button id="finalPanelClose" class="btn btn-ghost icon-btn" type="button" aria-label="Fechar painel">✕</button>
+      </div>
+      <pre id="finalText" class="final-text"></pre>
+      <button id="finalCopy" class="btn btn-gold" type="button">Copiar prompt</button>
+    </div>
+
+    <!-- Mensagens -->
+    <div id="messages" class="messages" aria-live="polite"></div>
+
+    <!-- Sugestões de início rápido -->
+    <div id="suggestionRow" class="suggestion-row">
+      <button class="suggestion-chip" type="button" data-suggestion="Quero fotos profissionais para o site da minha empresa de estética automotiva, mostrando antes e depois da lavagem detalhada.">🚗 Estética automotiva</button>
+      <button class="suggestion-chip" type="button" data-suggestion="Quero um vídeo curto para o Instagram mostrando meu produto em uso.">📱 Vídeo para Instagram</button>
+      <button class="suggestion-chip" type="button" data-suggestion="Quero editar uma foto de produto: trocar o fundo por um cenário mais bonito.">🖼️ Trocar fundo de foto</button>
+      <button class="suggestion-chip" type="button" data-suggestion="Quero editar um vídeo: cortes dinâmicos, música e legendas para redes sociais.">✂️ Editar vídeo</button>
+    </div>
+
+    <!-- Indicador de digitação -->
+    <div id="typingRow" class="typing-row" hidden>
+      <span class="robot-avatar robot-avatar-xs" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+          <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+          <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+          <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+          <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="typing-bubble" aria-label="O Robô de Prompts está digitando"><span></span><span></span><span></span></span>
+    </div>
+
+    <p id="chatError" class="form-error chat-error" role="alert" hidden></p>
+
+    <!-- Composer -->
+    <form id="composer" class="composer">
+      <textarea id="composerInput" rows="1" placeholder="Descreva o que você quer criar…" aria-label="Sua mensagem"></textarea>
+      <button id="sendBtn" class="btn btn-gold send-btn" type="submit" aria-label="Enviar mensagem">➤</button>
+    </form>
+    <p class="composer-hint">O Robô de Prompts lembra de tudo que você disser nesta conversa e refina o prompt a cada resposta.</p>
+  </main>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
