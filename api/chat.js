@@ -62,34 +62,46 @@ async function callGemini(apiKey, mode, history, finalRequest) {
       }],
     });
   }
-  const r = await fetch(GEMINI_URL + '?key=' + encodeURIComponent(apiKey), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemInstruction() }] },
-      contents,
-      generationConfig: { temperature: 0.7 },
-    }),
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: systemInstruction() }] },
+    contents,
+    generationConfig: { temperature: 0.7 },
   });
-  if (!r.ok) {
+  // O modelo responde 503 quando está sobrecarregado — pico temporário.
+  // Tenta de novo sozinho (até 3 vezes, com espera crescente) antes de
+  // devolver erro ao cliente, em vez de falhar na primeira tentativa.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const r = await fetch(GEMINI_URL + '?key=' + encodeURIComponent(apiKey), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const text =
+        data &&
+        data.candidates &&
+        data.candidates[0] &&
+        data.candidates[0].content &&
+        data.candidates[0].content.parts &&
+        data.candidates[0].content.parts.map((p) => p.text || '').join('');
+      if (!text) throw new Error('gemini_empty');
+      return text;
+    }
     let detail = '';
     try { detail = (await r.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
     // Registra só status + corpo do erro (nunca a chave, que vai na URL).
     console.error('gemini upstream error', r.status, detail);
+    const transient = r.status === 503 || r.status === 429;
+    if (transient && attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      continue;
+    }
     const e = new Error(r.status === 429 ? 'gemini_rate_limited' : 'gemini_error');
     e.status = r.status;
     throw e;
   }
-  const data = await r.json();
-  const text =
-    data &&
-    data.candidates &&
-    data.candidates[0] &&
-    data.candidates[0].content &&
-    data.candidates[0].content.parts &&
-    data.candidates[0].content.parts.map((p) => p.text || '').join('');
-  if (!text) throw new Error('gemini_empty');
-  return text;
+  throw new Error('gemini_error');
 }
 
 module.exports = async function handler(req, res) {
