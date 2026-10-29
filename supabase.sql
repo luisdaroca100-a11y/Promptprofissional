@@ -211,7 +211,8 @@ create index if not exists idx_finance_entries_user_data
 -- RODE SÓ ESTE TRECHO se você já rodou este arquivo antes com a
 -- coluna antiga. Idempotente: pode rodar 2x sem erro (só renomeia
 -- se a coluna antiga existe e a nova ainda não existe). Sem ela, o
--- contador de mensagens segue funcionando pela coluna antiga.
+-- contador de mensagens é tratado como 0 (limite diário sem efeito)
+-- até a migração ser rodada — o chat segue funcionando.
 -- ============================================================
 
 DO $$
