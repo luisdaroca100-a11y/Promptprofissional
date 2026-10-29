@@ -26,6 +26,13 @@ const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
 
+// Groq (API compatível com OpenAI): usada quando GROQ_API_KEY está
+// configurada. Sem ela, o chat usa só o Gemini (comportamento atual).
+// GROQ_MODEL permite trocar o modelo sem novo deploy de código;
+// GROQ_API_BASE existe para testes locais (aponta para um mock).
+const GROQ_BASE = (process.env.GROQ_API_BASE || 'https://api.groq.com/openai/v1').replace(/\/$/, '');
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 // Instrução única e neutra: sem botões de modo na tela, o robô
 // interpreta pelo que o cliente escreve se é foto, vídeo ou edição.
 function systemInstruction() {
@@ -129,12 +136,86 @@ async function callGemini(apiKey, mode, history, finalRequest) {
   throw new Error('gemini_error');
 }
 
+// Mesmo contrato do callGemini, mas via endpoint compatível com a API
+// de chat da OpenAI (Groq). A chave vai no header Authorization, nunca
+// na URL. Mesma política de retentativa: até 3 tentativas, 60s cada,
+// espera crescente em 429/5xx.
+async function callGroq(apiKey, mode, history, finalRequest) {
+  const messages = [{ role: 'system', content: systemInstruction() }];
+  for (const m of history) {
+    messages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content });
+  }
+  if (finalRequest) {
+    messages.push({
+      role: 'user',
+      content: 'Com base em TODA esta conversa, gere agora o prompt final completo e estruturado, '
+        + 'envolvido exatamente nos marcadores ---PROMPT_PT---, ---PROMPT_EN--- e ---END---, sem nenhum texto fora deles.',
+    });
+  }
+  const body = JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.7 });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    let r;
+    try {
+      r = await fetch(GROQ_BASE + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + apiKey,
+        },
+        body,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        console.error('groq timeout', 'attempt', attempt);
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+        const e = new Error('groq_error');
+        e.status = 504;
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (r.ok) {
+      const data = await r.json();
+      const text =
+        data &&
+        data.choices &&
+        data.choices[0] &&
+        data.choices[0].message &&
+        data.choices[0].message.content;
+      if (!text) throw new Error('groq_empty');
+      return text;
+    }
+    let detail = '';
+    try { detail = (await r.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
+    // Registra só status + corpo do erro (a chave vai no header, fora do log).
+    console.error('groq upstream error', r.status, detail);
+    const transient = r.status === 429 || r.status >= 500;
+    if (transient && attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      continue;
+    }
+    const e = new Error(r.status === 429 ? 'groq_rate_limited' : 'groq_error');
+    e.status = r.status;
+    throw e;
+  }
+  throw new Error('groq_error');
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Método não permitido.' });
   }
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!geminiKey && !groqKey) {
     return json(res, 500, { error: 'A IA não está configurada no servidor. Fale com o responsável pelo site.' });
   }
   try {
@@ -186,9 +267,27 @@ module.exports = async function handler(req, res) {
       '&select=role,content&order=created_at.asc&limit=200'
     );
 
+    // Provedor: Groq primeiro quando a chave existe; se ela falhar
+    // (após as retentativas) e o Gemini estiver configurado, cai para
+    // o Gemini em vez de devolver erro ao cliente. Sem chave da Groq,
+    // o comportamento é o de sempre (só Gemini).
     let reply;
+    let provider = null;
     try {
-      reply = await callGemini(apiKey, mode, history, finalRequest);
+      if (groqKey) {
+        try {
+          reply = await callGroq(groqKey, mode, history, finalRequest);
+          provider = 'groq';
+        } catch (groqErr) {
+          console.error('groq failed, trying gemini fallback', groqErr && groqErr.status);
+          if (!geminiKey) throw groqErr;
+          reply = await callGemini(geminiKey, mode, history, finalRequest);
+          provider = 'gemini';
+        }
+      } else {
+        reply = await callGemini(geminiKey, mode, history, finalRequest);
+        provider = 'gemini';
+      }
     } catch (err) {
       if (err && err.status === 429) {
         return json(res, 429, { error: 'A IA está com muitas requisições agora. Tente de novo em alguns minutos.' });
@@ -206,6 +305,7 @@ module.exports = async function handler(req, res) {
     return json(res, 200, {
       reply,
       final: finalRequest,
+      provider,
       usage: { used: used + 1, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - used - 1) },
     });
   } catch (err) {

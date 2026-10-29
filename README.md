@@ -29,7 +29,7 @@ app.js                     Lógica do chat, conversas, pagamento Pix
 api/_lib.js                Helpers (Supabase REST, auth, acesso, uso)
 api/config.js              Config pública (URL + anon key do Supabase)
 api/me.js                  Usuário atual + acesso + uso do dia
-api/chat.js                Proxy do Gemini (memória total da conversa)
+api/chat.js                Proxy de IA — Groq (se GROQ_API_KEY existir) com fallback pro Gemini; memória total da conversa
 api/mp-create-payment.js   Cria Pix + verifica pagamento já feito
 api/mp-webhook.js          Webhook do Mercado Pago (libera acesso)
 supabase.sql               Schema completo (tabelas + RLS + trigger)
@@ -49,16 +49,24 @@ e um trigger que cria o perfil ao cadastrar.
 > Em **Authentication > URL Configuration**, ajuste o **Site URL** para o
 > domínio final do site na Vercel (ex.: `https://promptprofissional.vercel.app`).
 
-## 2. Chave do Gemini (Google AI Studio)
+## 2. IA — Groq (teste gratuito) ou Gemini (Google AI Studio)
 
-1. Abra https://aistudio.google.com/apikey (conta Google do dono do site).
-2. Clique em **Create API key** e copie a chave.
+Se a variável `GROQ_API_KEY` estiver configurada, o chat usa a **Groq**
+( endpoint compatível com a API da OpenAI, modelo padrão
+`openai/gpt-oss-120b`, trocável por `GROQ_MODEL`) e só cai para o Gemini
+se a Groq falhar. Sem a chave da Groq, o chat usa só o Gemini, como antes.
+
+1. Abra https://console.groq.com (crie a conta com e-mail, Google ou GitHub).
+2. Em **API Keys**, clique em **Create API Key** e copie a chave.
+   O plano gratuito não pede cartão.
 3. Ela será colada como variável de ambiente na Vercel (passo 4) — **nunca**
    cole a chave no código, no chat ou no repositório.
 
-Modelo usado: `gemini-2.0-flash`. A cota gratuita do Gemini é compartilhada
-entre todos os usuários do site; se o volume crescer, ative o faturamento
-(billing) no Google Cloud do projeto da chave — o código não muda.
+O Gemini continua como alternativa/fallback: a chave sai do
+https://aistudio.google.com/apikey (modelo usado: `gemini-3.8-flash`).
+A cota gratuita do Gemini é compartilhada entre todos os usuários do site;
+se o volume crescer, ative o faturamento (billing) no Google Cloud do
+projeto da chave — o código não muda.
 
 ## 3. Mercado Pago (Pix)
 
@@ -89,7 +97,9 @@ entre todos os usuários do site; se o volume crescer, ative o faturamento
    | `SUPABASE_URL` | Supabase > Settings > API > Project URL |
    | `SUPABASE_ANON_KEY` | Supabase > Settings > API > anon public |
    | `SUPABASE_SERVICE_ROLE_KEY` | Supabase > Settings > API > service_role (segredo — só no servidor) |
-   | `GEMINI_API_KEY` | Google AI Studio (passo 2) |
+   | `GEMINI_API_KEY` | Google AI Studio (passo 2) — fallback |
+   | `GROQ_API_KEY` | Console da Groq (passo 2) — provedor principal quando configurada |
+   | `GROQ_MODEL` | Opcional: outro modelo Groq (padrão `openai/gpt-oss-120b`) |
    | `MP_ACCESS_TOKEN` | Mercado Pago Developers (passo 3) |
 
 5. Clique em **Deploy**. Pronto: o site estará no domínio `.vercel.app`
@@ -115,8 +125,8 @@ entre todos os usuários do site; se o volume crescer, ative o faturamento
 
 - **Limite diário:** 50 prompts por usuário/dia (constante `DAILY_LIMIT`
   em `api/chat.js` e `api/me.js`). Ajuste o número nas duas constantes.
-- **Memória:** o backend envia o histórico completo da conversa ao Gemini
-  a cada turno (limitado às últimas 200 mensagens por conversa).
+- **Memória:** o backend envia o histórico completo da conversa à IA
+  (Groq ou Gemini) a cada turno (limitado às últimas 200 mensagens por conversa).
 - **Teste único:** cada conta só pode comprar o teste de R$ 1,99 uma vez
   (verificado em `processed_payments`).
 - **Webhook idempotente:** notificações duplicadas do mesmo `payment_id`
@@ -138,7 +148,7 @@ entre todos os usuários do site; se o volume crescer, ative o faturamento
 
 ## Segurança
 
-- As chaves `service_role`, `GEMINI_API_KEY` e `MP_ACCESS_TOKEN` só existem
+- As chaves `service_role`, `GEMINI_API_KEY`, `GROQ_API_KEY` e `MP_ACCESS_TOKEN` só existem
   como variáveis de ambiente no servidor. O frontend recebe, via
   `/api/config`, apenas a URL e a anon key do Supabase (feitas para uso no
   navegador e protegidas pelas políticas RLS).

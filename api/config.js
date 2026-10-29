@@ -16,5 +16,11 @@ module.exports = async function handler(req, res) {
       error: 'Configuração do servidor incompleta. Faltam variáveis de ambiente do Supabase.',
     });
   }
-  return json(res, 200, { supabaseUrl: url, supabaseAnonKey: anon });
+  return json(res, 200, {
+    supabaseUrl: url,
+    supabaseAnonKey: anon,
+    // Só um booleano: o navegador (e a conferência do deploy) sabe se
+    // a chave da Groq está configurada, sem nunca ver o valor dela.
+    groqConfigured: Boolean(process.env.GROQ_API_KEY),
+  });
 };
