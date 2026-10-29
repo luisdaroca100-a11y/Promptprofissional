@@ -219,12 +219,89 @@ input, textarea { font: inherit; color: var(--text); }
 }
 .access-label { color: var(--gold); }
 
-.chat-main {
+/* Tela inicial (resumo do mês): rola por conta própria e deixa espaço
+   livre embaixo para o botão fixo que abre o chat. */
+.summary-main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  overflow-y: auto;
+  padding-bottom: calc(108px + env(safe-area-inset-bottom));
+}
+.summary-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+  margin: 14px 16px 0;
+}
+
+/* Botão central na parte de baixo: abre o chat. Só existe dentro da
+   tela logada (#appView). Fonte >= 16px para o iOS não dar zoom. */
+.open-chat-btn {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 30;
+  min-height: 56px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #111;
+  font-size: 17px;
+  font-weight: 800;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(245, 179, 1, 0.35);
+}
+.open-chat-btn:hover { background: var(--gold-dark); }
+.open-chat-btn:active { transform: translateX(-50%) scale(0.97); }
+
+/* Chat em overlay: camada por cima da tela inicial. No celular ocupa a
+   tela cheia; no desktop vira um painel centralizado sobre um fundo escuro. */
+.chat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overscroll-behavior: contain;
+}
+.chat-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.chat-overlay .messages {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.chat-close-btn { margin-left: auto; font-size: 17px; padding: 8px 12px; }
+body.chat-open { overflow: hidden; }
+body.chat-open .sidebar { z-index: 70; }
+@media (min-width: 861px) {
+  .chat-overlay {
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.65);
+    padding: 24px;
+  }
+  .chat-sheet {
+    flex: none;
+    width: 100%;
+    max-width: 760px;
+    height: min(880px, calc(100dvh - 48px));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
 }
 
 /* Cabeçalho do chat */
@@ -236,7 +313,8 @@ input, textarea { font: inherit; color: var(--text); }
   border-bottom: 1px solid var(--border);
   background: var(--bg-soft);
 }
-.chat-header .icon-btn#sidebarOpen { display: none; }
+.chat-header .icon-btn#sidebarOpen,
+.chat-header .icon-btn#chatSidebarOpen { display: none; }
 .chat-identity { display: flex; flex-direction: column; min-width: 0; }
 .chat-identity strong { font-size: 17px; }
 .online-status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -464,7 +542,8 @@ input, textarea { font: inherit; color: var(--text); }
   }
   .sidebar.open { transform: translateX(0); }
   .sidebar-top .icon-btn { display: inline-block; }
-  .chat-header .icon-btn#sidebarOpen { display: inline-block; }
+  .chat-header .icon-btn#sidebarOpen,
+  .chat-header .icon-btn#chatSidebarOpen { display: inline-block; }
   .bubble { max-width: 86%; }
   .finance-totals { grid-template-columns: repeat(2, 1fr); }
   .chat-header .btn-gold { padding: 8px 10px; font-size: 13px; }

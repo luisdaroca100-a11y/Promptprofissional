@@ -153,8 +153,8 @@
     </div>
   </aside>
 
-  <main class="chat-main">
-    <!-- Cabeçalho do chat, estilo assistente de mensagens -->
+  <main class="summary-main">
+    <!-- Cabeçalho da tela inicial (resumo do mês) -->
     <header class="chat-header">
       <button id="sidebarOpen" class="btn btn-ghost icon-btn" type="button" aria-label="Abrir menu">☰</button>
       <span class="robot-avatar" aria-hidden="true">
@@ -172,9 +172,8 @@
       </span>
       <div class="chat-identity">
         <strong>Robô Financeiro</strong>
-        <span class="online-status"><span class="online-dot"></span>Online · registra seus gastos e mostra o resumo</span>
+        <span class="online-status"><span class="online-dot"></span>Online · seu assistente financeiro</span>
       </div>
-      <button id="financeToggleBtn" class="btn btn-gold" type="button">💰 Resumo do mês</button>
     </header>
 
     <!-- Painel do resumo do mês -->
@@ -195,6 +194,36 @@
       <ul id="financeList" class="finance-list"></ul>
       <p id="financeEmpty" class="finance-empty">Nenhum registro neste mês ainda. Conte ao Robô Financeiro, por exemplo: "Gastei R$ 120 no mercado hoje."</p>
     </section>
+    <p class="summary-hint">Toque no botão abaixo para falar com o Robô Financeiro: ele registra seus gastos e faturas e atualiza este resumo.</p>
+  </main>
+
+  <!-- Botão central que abre o chat -->
+  <button id="openChatBtn" class="open-chat-btn" type="button">🤖 Robô Financeiro</button>
+
+  <!-- Chat em overlay: só abre pelo botão, por cima da tela inicial -->
+  <section id="chatOverlay" class="chat-overlay" hidden role="dialog" aria-modal="true" aria-label="Chat com o Robô Financeiro">
+    <div class="chat-sheet">
+      <header class="chat-header">
+        <button id="chatSidebarOpen" class="btn btn-ghost icon-btn" type="button" aria-label="Abrir menu">☰</button>
+        <span class="robot-avatar" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="32" cy="4" r="3.5" fill="#f5b301"/>
+            <rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>
+            <rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+            <rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>
+            <circle cx="23" cy="29" r="4.5" fill="#f5b301"/>
+            <circle cx="41" cy="29" r="4.5" fill="#f5b301"/>
+            <path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="chat-identity">
+          <strong>Robô Financeiro</strong>
+          <span class="online-status"><span class="online-dot"></span>Online · registra seus gastos e mostra o resumo</span>
+        </div>
+        <button id="chatCloseBtn" class="btn btn-ghost icon-btn chat-close-btn" type="button" aria-label="Fechar chat">✕</button>
+      </header>
 
     <!-- Mensagens -->
     <div id="messages" class="messages" aria-live="polite"></div>
@@ -225,7 +254,8 @@
       <button id="sendBtn" class="btn btn-gold send-btn" type="submit" aria-label="Enviar mensagem">➤</button>
     </form>
     <p class="composer-hint">O Robô Financeiro lembra da conversa, registra seus gastos e faturas e mostra o resumo do mês.</p>
-  </main>
+    </div>
+  </section>
 </section>
 
 <script type="module" src="app.js"></script>

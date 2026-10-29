@@ -3,6 +3,7 @@
 // (login e tabelas, protegidas por RLS). Nenhuma chave de IA ou de
 // pagamento passa pelo navegador.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createChatOverlay } from './chat-overlay.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,6 +31,7 @@ let authMode = 'login';
 let sending = false;
 let financeMonth = new Date().toISOString().slice(0, 7);
 let financeLoading = false;
+let chatOverlay = null;
 
 function escapeHtml(s) {
   return String(s)
@@ -94,6 +96,7 @@ async function init() {
     session = newSession;
     if (!newSession) {
       currentConversationId = null;
+      if (chatOverlay) chatOverlay.close();
       showView('auth');
     }
   });
@@ -194,6 +197,7 @@ async function logout() {
   session = null;
   me = null;
   currentConversationId = null;
+  if (chatOverlay) chatOverlay.close();
   showView('auth');
 }
 
@@ -269,8 +273,8 @@ function renderWelcome() {
   card.innerHTML =
     '<span class="robot-avatar robot-avatar-sm" aria-hidden="true">' + ROBOT_SVG + '</span>' +
     '<div class="welcome-card"><h2>Olá! Eu sou o Robô Financeiro 🤖</h2>' +
-    '<p>Me conte seus gastos, ganhos, faturas de cartão, contas e dívidas — por exemplo: "Gastei R$ 120 no mercado hoje" ou "Minha fatura do cartão fechou em R$ 850, vence dia 10". Eu registro tudo, lembro da conversa e mostro o resumo do mês no painel acima.</p>' +
-    '<p>Quando quiser registrar, é só dizer "registra" ou "anota aí" que eu anoto na hora, sem mais perguntas.</p></div>';
+    '<p>Me conte seus gastos, ganhos, faturas de cartão, contas e dívidas — por exemplo: "Gastei R$ 120 no mercado hoje" ou "Minha fatura do cartão fechou em R$ 850, vence dia 10". Eu registro tudo e lembro da conversa.</p>' +
+    '<p>O resumo do mês fica na tela inicial: feche o chat no ✕ para ver os totais atualizados.</p></div>';
   box.appendChild(card);
   scrollMessages();
 }
@@ -524,14 +528,26 @@ function bindChat() {
     }
   });
 
-  $('financeToggleBtn').addEventListener('click', () => {
-    $('financePanel').hidden = !$('financePanel').hidden;
-  });
   $('financeRefresh').addEventListener('click', loadFinanceSummary);
   $('monthSelect').addEventListener('change', () => {
     financeMonth = $('monthSelect').value;
     loadFinanceSummary();
   });
+
+  // O chat vive num overlay por cima da tela inicial: abre pelo botão
+  // central na parte de baixo; fechar recarrega o resumo do mês.
+  chatOverlay = createChatOverlay(
+    {
+      overlay: $('chatOverlay'),
+      openButton: $('openChatBtn'),
+      closeButton: $('chatCloseBtn'),
+      input: $('composerInput'),
+      messages: $('messages'),
+      body: document.body,
+    },
+    { onClose: () => { if (session) loadFinanceSummary(); } },
+  );
+  $('chatSidebarOpen').addEventListener('click', () => $('sidebar').classList.add('open'));
 }
 
 function autoresizeComposer() {
