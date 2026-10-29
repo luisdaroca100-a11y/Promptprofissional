@@ -65,17 +65,42 @@ async function callGemini(apiKey, mode, history, finalRequest) {
   const body = JSON.stringify({
     system_instruction: { parts: [{ text: systemInstruction() }] },
     contents,
-    generationConfig: { temperature: 0.7 },
+    // thinkingLevel baixo: as respostas aqui são conversas curtas, não
+    // precisam do raciocínio longo padrão do modelo (que alongava muito
+    // cada resposta). Se a API rejeitar o parâmetro, os logs mostram 400.
+    generationConfig: { temperature: 0.7, thinkingConfig: { thinkingLevel: 'low' } },
   });
   // O modelo responde 503 quando está sobrecarregado — pico temporário.
   // Tenta de novo sozinho (até 3 vezes, com espera crescente) antes de
   // devolver erro ao cliente, em vez de falhar na primeira tentativa.
+  // Cada tentativa tem limite de 60s: sem isso, uma chamada travada no
+  // Google segurava a resposta até o limite de 5 minutos da função.
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const r = await fetch(GEMINI_URL + '?key=' + encodeURIComponent(apiKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    let r;
+    try {
+      r = await fetch(GEMINI_URL + '?key=' + encodeURIComponent(apiKey), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        console.error('gemini timeout', 'attempt', attempt);
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+        const e = new Error('gemini_error');
+        e.status = 504;
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
     if (r.ok) {
       const data = await r.json();
       const text =
