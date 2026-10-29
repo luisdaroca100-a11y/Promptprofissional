@@ -1,4 +1,4 @@
-# Gerador de Prompts — Robô de Prompts
+# Gerador de Prompts — Robô dos Prompts
 
 Site de gerador de prompts em formato de **conversa**: o usuário descreve o que quer
 (foto, vídeo, edição de foto ou edição de vídeo), o assistente lembra da conversa
@@ -103,7 +103,7 @@ entre todos os usuários do site; se o volume crescer, ative o faturamento
 1. Abra o site, crie uma conta com e-mail e senha.
 2. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
    (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.
-3. Converse com o Robô de Prompts: descreva o que quer, responda às
+3. Converse com o Robô dos Prompts: descreva o que quer, responda às
    perguntas dele e toque em **“✨ Gerar prompt final”** para ver o
    prompt em PT + EN com botão de copiar.
 4. Feche e reabra o navegador: o histórico da conversa continua lá

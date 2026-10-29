@@ -1,4 +1,4 @@
-// Gerador de Prompts — frontend (chat com o Robô de Prompts).
+// Gerador de Prompts — frontend (chat com o Robô dos Prompts).
 // O navegador fala SOMENTE com /api/* deste site e com o Supabase Auth
 // (login e tabelas, protegidas por RLS). Nenhuma chave de IA ou de
 // pagamento passa pelo navegador.
@@ -122,7 +122,7 @@ async function route() {
     showView('app');
     await loadConversations();
   } else {
-    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com o Robô de Prompts.';
+    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com o Robô dos Prompts.';
     $('pixArea').hidden = true;
     showView('pay');
   }
@@ -267,7 +267,7 @@ function renderWelcome() {
   card.className = 'message-row assistant';
   card.innerHTML =
     '<span class="robot-avatar robot-avatar-sm" aria-hidden="true">' + ROBOT_SVG + '</span>' +
-    '<div class="welcome-card"><h2>Olá! Eu sou o Robô de Prompts 🤖</h2>' +
+    '<div class="welcome-card"><h2>Olá! Eu sou o Robô dos Prompts 🤖</h2>' +
     '<p>Me conte o que você quer criar — uma foto, um vídeo ou uma edição. Eu vou perguntando o que falta, lembrando de tudo que você disser e refinando o prompt com você.</p>' +
     '<p>Quando estiver pronto, toque em <strong>✨ Gerar prompt final</strong> e eu entrego o prompt em português e em inglês, pronto para copiar.</p></div>';
   box.appendChild(card);
@@ -386,7 +386,7 @@ function setFinalTab(which) {
   $('finalText').textContent =
     which === 'pt'
       ? currentFinal.pt
-      : (currentFinal.en || 'A versão em inglês não veio nesta resposta. Peça ao Robô de Prompts para gerar o prompt final de novo.');
+      : (currentFinal.en || 'A versão em inglês não veio nesta resposta. Peça ao Robô dos Prompts para gerar o prompt final de novo.');
 }
 
 async function copyText(text, feedbackBtn) {
