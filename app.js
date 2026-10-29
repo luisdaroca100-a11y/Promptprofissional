@@ -6,13 +6,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const $ = (id) => document.getElementById(id);
 
-const MODES = {
-  foto: 'Foto',
-  video: 'Vídeo',
-  edicao_foto: 'Edição de foto',
-  edicao_video: 'Edição de vídeo',
-};
-
 const ROBOT_SVG =
   '<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
   '<line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
@@ -29,6 +22,8 @@ let supabase = null;
 let session = null;
 let me = null;
 let currentConversationId = null;
+// Modo interno fixo: sem botões de escolha — o robô interpreta pelo
+// texto do cliente se é foto, vídeo ou edição.
 let currentMode = 'foto';
 let currentFinal = { pt: '', en: '' };
 let currentPaymentId = null;
@@ -237,7 +232,6 @@ async function newConversation(mode) {
   if (error || !data) return null;
   currentConversationId = data.id;
   currentMode = mode;
-  syncModeChips();
   $('messages').innerHTML = '';
   renderWelcome();
   $('finalPanel').hidden = true;
@@ -249,7 +243,6 @@ async function newConversation(mode) {
 async function openConversation(id, mode) {
   currentConversationId = id;
   currentMode = mode || 'foto';
-  syncModeChips();
   $('finalPanel').hidden = true;
   const { data } = await supabase
     .from('messages')
@@ -266,12 +259,6 @@ async function openConversation(id, mode) {
   scrollMessages();
   await loadConversations();
   $('sidebar').classList.remove('open');
-}
-
-function syncModeChips() {
-  document.querySelectorAll('.mode-chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.mode === currentMode);
-  });
 }
 
 function renderWelcome() {
@@ -429,25 +416,6 @@ function bindChat() {
   $('newChatBtn').addEventListener('click', async () => {
     currentConversationId = null;
     await newConversation(currentMode);
-  });
-
-  document.querySelectorAll('.mode-chip').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      currentMode = chip.dataset.mode;
-      syncModeChips();
-      if (currentConversationId) {
-        await supabase
-          .from('conversations')
-          .update({ mode: currentMode })
-          .eq('id', currentConversationId);
-      }
-    });
-  });
-
-  document.querySelectorAll('.suggestion-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      sendMessage(chip.dataset.suggestion);
-    });
   });
 
   $('composer').addEventListener('submit', (e) => {

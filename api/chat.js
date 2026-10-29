@@ -26,30 +26,21 @@ const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
 
-const MODE_LABELS = {
-  foto: 'foto',
-  video: 'vídeo',
-  edicao_foto: 'edição de foto',
-  edicao_video: 'edição de vídeo',
-};
-
-function systemInstruction(mode) {
-  const label = MODE_LABELS[mode] || 'foto';
-  const specifics = {
-    foto: 'Para FOTO: pense em composição, luz, câmera e lente, cenário, cores, estilo e proporção. Pergunte o que falta (objetivo, onde a foto será usada, estilo) antes de fechar o prompt.',
-    video: 'Para VÍDEO: pense em duração, movimento de câmera, ritmo, narração, formato (vertical 9:16 para redes sociais, salvo pedido diferente) e som. Pergunte o que falta antes de fechar o prompt.',
-    edicao_foto: 'Para EDIÇÃO DE FOTO: pergunte o que deve ser mantido e o que deve mudar, e se há foto de referência. Descreva a edição de forma objetiva e reproduzível.',
-    edicao_video: 'Para EDIÇÃO DE VÍDEO: pense em cortes, ritmo, trilha, legendas e formato final. Pergunte o que falta antes de fechar o prompt.',
-  }[mode] || '';
+// Instrução única e neutra: sem botões de modo na tela, o robô
+// interpreta pelo que o cliente escreve se é foto, vídeo ou edição.
+function systemInstruction() {
   return (
     'Você é o Robô de Prompts, um engenheiro de prompts profissional que conversa em português. ' +
-    'O usuário está criando um prompt de ' + label + '. ' +
+    'O usuário está criando um prompt — interprete pelo que ele escrever se é FOTO, VÍDEO, EDIÇÃO DE FOTO ou EDIÇÃO DE VÍDEO, e adapte as perguntas e o prompt a esse tipo. ' +
+    'Para FOTO: pense em composição, luz, câmera e lente, cenário, cores, estilo e proporção. ' +
+    'Para VÍDEO: pense em duração, movimento de câmera, ritmo, narração, formato (vertical 9:16 para redes sociais, salvo pedido diferente) e som. ' +
+    'Para EDIÇÃO DE FOTO: pergunte o que deve ser mantido e o que deve mudar, e se há foto de referência; descreva a edição de forma objetiva e reproduzível. ' +
+    'Para EDIÇÃO DE VÍDEO: pense em cortes, ritmo, trilha, legendas e formato final. ' +
     'Regras obrigatórias: ' +
     '1) Faça UMA pergunta de esclarecimento por vez quando faltar informação importante — nunca faça várias perguntas de uma vez. ' +
     '2) Lembre-se de TUDO que o usuário já disse nesta conversa e refine o prompt a cada resposta, mostrando a evolução. ' +
     '3) NUNCA repita o mesmo prompt genérico: cada resposta deve incorporar o que foi conversado. ' +
     '4) Seja direto e útil, em português, com tom profissional e amigável. ' +
-    specifics + ' ' +
     'Quando o usuário pedir o prompt final, gere o prompt final completo e estruturado, ' +
     'envolvido EXATAMENTE nestes marcadores, sem texto fora deles: ' +
     '---PROMPT_PT--- (o prompt final em português) ---PROMPT_EN--- (o mesmo prompt em inglês, ' +
@@ -75,7 +66,7 @@ async function callGemini(apiKey, mode, history, finalRequest) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemInstruction(mode) }] },
+      system_instruction: { parts: [{ text: systemInstruction() }] },
       contents,
       generationConfig: { temperature: 0.7 },
     }),
