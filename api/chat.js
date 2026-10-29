@@ -80,13 +80,12 @@ async function callGemini(apiKey, mode, history, finalRequest) {
       generationConfig: { temperature: 0.7 },
     }),
   });
-  if (r.status === 429) {
-    const e = new Error('gemini_rate_limited');
-    e.status = 429;
-    throw e;
-  }
   if (!r.ok) {
-    const e = new Error('gemini_error');
+    let detail = '';
+    try { detail = (await r.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
+    // Registra só status + corpo do erro (nunca a chave, que vai na URL).
+    console.error('gemini upstream error', r.status, detail);
+    const e = new Error(r.status === 429 ? 'gemini_rate_limited' : 'gemini_error');
     e.status = r.status;
     throw e;
   }
