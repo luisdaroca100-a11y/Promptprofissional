@@ -102,6 +102,7 @@ async function init() {
   });
 
   bindAuth();
+  bindLanding();
   bindChat();
   bindPay();
   await route();
@@ -181,6 +182,22 @@ function setAuthMode(mode) {
   $('tabSignup').classList.toggle('active', mode === 'signup');
   $('authSubmit').textContent = mode === 'login' ? 'Entrar' : 'Criar conta';
   $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+}
+
+// Botões da página pública: escolhem a aba (Entrar/Criar conta) e rolam
+// até o cartão de login/cadastro, com foco no campo de e-mail.
+function goToAuth(mode) {
+  setAuthMode(mode);
+  const target = $('authSection');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => { const el = $('authEmail'); if (el) el.focus({ preventScroll: true }); }, 400);
+}
+
+function bindLanding() {
+  document.querySelectorAll('.js-go-login').forEach((b) =>
+    b.addEventListener('click', () => goToAuth('login')));
+  document.querySelectorAll('.js-go-signup').forEach((b) =>
+    b.addEventListener('click', () => goToAuth('signup')));
 }
 
 function translateAuthError(err) {

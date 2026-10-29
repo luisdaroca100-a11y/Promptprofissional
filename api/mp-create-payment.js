@@ -86,7 +86,7 @@ module.exports = async function handler(req, res) {
       transaction_amount: PLANS[plan].amount,
       description: PLANS[plan].label,
       payment_method_id: 'pix',
-      payer: { email: user.email || 'cliente@geradordeprompts.com.br' },
+      payer: { email: user.email || 'cliente@assistentefinanceiro.com.br' },
       external_reference: user.id + ':' + plan + ':' + Date.now(),
     };
     if (notificationUrl) paymentBody.notification_url = notificationUrl;

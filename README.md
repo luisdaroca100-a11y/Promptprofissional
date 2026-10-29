@@ -27,7 +27,7 @@ está no código.
 ## Estrutura
 
 ```
-index.html                 Frontend: login, chat, resumo do mês, planos/Pix
+index.html                 Frontend: página pública, login, chat, resumo do mês, planos/Pix
 styles.css                 Tema escuro profissional, acento dourado
 app.js                     Lógica do chat, conversas, resumo do mês, pagamento Pix
 api/_lib.js                Helpers (Supabase REST, auth, acesso, uso)
@@ -50,11 +50,13 @@ Ele cria: `profiles`, `user_access`, `usage`, `conversations`, `messages`,
 `processed_payments` e `finance_entries`, com RLS ativado (cada usuário só
 vê os próprios dados) e um trigger que cria o perfil ao cadastrar.
 
-> Quem **já rodou** o `supabase.sql` antes (na época do gerador de prompts)
-> precisa rodar **só o trecho final** marcado `NOVO (Assistente Financeiro)`:
-> ele cria apenas a tabela `finance_entries`. Sem ela, o chat avisa que não
-> conseguiu salvar os registros (nada se perde em silêncio) e o painel de
-> resumo mostra o aviso de SQL pendente.
+> Quem **já rodou** o `supabase.sql` antes precisa rodar **só os trechos
+> finais** marcados `NOVO (Assistente Financeiro)` (cria apenas a tabela
+> `finance_entries`) e `MIGRAÇÃO` (renomeia a coluna do contador de
+> mensagens na tabela `usage`). Sem a tabela nova, o chat avisa que
+> não conseguiu salvar os registros (nada se perde em silêncio) e o painel
+> de resumo mostra o aviso de SQL pendente. Sem a migração, o contador de
+> mensagens segue tratando o uso como 0 até ela ser rodada.
 
 > Em **Authentication > Providers**, deixe o provedor **Email** ativado.
 > Em **Authentication > URL Configuration**, ajuste o **Site URL** para o
@@ -152,8 +154,8 @@ perder.
 
 ## 5. Como testar (fluxo completo)
 
-1. Rode o trecho novo do `supabase.sql` (tabela `finance_entries`) no SQL
-   Editor do Supabase.
+1. Rode os trechos novos do `supabase.sql` (tabela `finance_entries` +
+   migração do contador de mensagens) no SQL Editor do Supabase.
 2. Abra o site, crie uma conta com e-mail e senha.
 3. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
    (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.

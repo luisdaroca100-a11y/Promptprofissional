@@ -3,9 +3,10 @@
 -- Rode este arquivo inteiro no SQL Editor do Supabase
 -- (Dashboard do projeto > SQL Editor > New query > colar > Run)
 --
--- Quem JÁ rodou este arquivo antes: rode SÓ o trecho final marcado
--- "NOVO (Assistente Financeiro)" — ele só cria a tabela
--- finance_entries (o resto usa "if not exists" e não muda nada).
+-- Quem JÁ rodou este arquivo antes: rode SÓ os trechos finais marcados
+-- "NOVO (Assistente Financeiro)" e "MIGRAÇÃO" — o primeiro só cria a
+-- tabela finance_entries e o segundo só renomeia a coluna do contador
+-- de mensagens (o resto usa "if not exists" e não muda nada).
 --
 -- Variáveis de ambiente que o app precisa na Vercel:
 --   SUPABASE_URL           (URL do projeto — Settings > API)
@@ -36,7 +37,7 @@ create table if not exists public.user_access (
 create table if not exists public.usage (
   user_id uuid not null references auth.users (id) on delete cascade,
   day date not null,
-  prompt_count int not null default 0,
+  message_count int not null default 0,
   primary key (user_id, day)
 );
 
@@ -204,3 +205,24 @@ create policy "finance_entries_delete_own" on public.finance_entries
 
 create index if not exists idx_finance_entries_user_data
   on public.finance_entries (user_id, data desc);
+
+-- ============================================================
+-- MIGRAÇÃO (renomeia prompt_count → message_count, 2026-10-29)
+-- RODE SÓ ESTE TRECHO se você já rodou este arquivo antes com a
+-- coluna antiga. Idempotente: pode rodar 2x sem erro (só renomeia
+-- se a coluna antiga existe e a nova ainda não existe). Sem ela, o
+-- contador de mensagens segue funcionando pela coluna antiga.
+-- ============================================================
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usage' AND column_name = 'prompt_count'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usage' AND column_name = 'message_count'
+  ) THEN
+    ALTER TABLE public.usage RENAME COLUMN prompt_count TO message_count;
+  END IF;
+END $$;

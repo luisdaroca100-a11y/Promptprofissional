@@ -5,12 +5,141 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Assistente Financeiro — Robô Financeiro</title>
 <meta name="description" content="Converse com o Robô Financeiro e organize suas finanças pessoais: gastos mensais, faturas de cartão, contas, dívidas e orçamento. Ele registra tudo e mostra o resumo do mês.">
+<meta name="theme-color" content="#050505">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Assistente Financeiro — Robô Financeiro">
+<meta property="og:description" content="Suas finanças organizadas conversando com um assistente: gastos mensais, faturas de cartão, contas, dívidas e orçamento. Ele registra tudo e mostra o resumo do mês.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- ============ TELA DE LOGIN / CADASTRO ============ -->
-<section id="authView" class="auth-view">
+<!-- ============ PÁGINA PÚBLICA + LOGIN / CADASTRO ============ -->
+<section id="authView" class="landing-view">
+  <header class="landing-header">
+    <span class="landing-brand">🤖 Assistente Financeiro</span>
+    <button class="btn btn-outline js-go-login" type="button">Entrar</button>
+  </header>
+
+  <div class="landing-hero">
+    <p class="landing-eyebrow">🤖 Robô Financeiro · seu assistente de finanças</p>
+    <h1>Suas finanças organizadas conversando com um assistente</h1>
+    <p class="landing-sub">Fale seus gastos mensais, faturas de cartão, contas e dívidas. O Robô Financeiro registra tudo e mostra o resumo do mês: ganhos, gastos, faturas e saldo.</p>
+    <div class="landing-cta">
+      <button class="btn btn-gold js-go-signup" type="button">Criar conta</button>
+      <button class="btn btn-outline js-go-login" type="button">Entrar</button>
+    </div>
+    <p class="landing-price-note">Teste de 1 dia por <strong>R$ 1,99</strong> · Assinatura <strong>R$ 19,90/mês</strong> · Pagamento via Pix</p>
+  </div>
+
+  <div class="landing-section" aria-label="Como funciona">
+    <h2>Como funciona</h2>
+    <ol class="steps">
+      <li>
+        <span class="step-num">1</span>
+        <strong>Crie sua conta</strong>
+        <span>Leva menos de um minuto: só e-mail e senha.</span>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <strong>Converse com o Robô Financeiro</strong>
+        <span>Fale seus gastos e faturas como numa conversa. Ele registra tudo e lembra do que já foi dito.</span>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <strong>Veja o resumo do mês</strong>
+        <span>Ganhos, gastos, faturas de cartão, dívidas em aberto e saldo, sempre atualizados.</span>
+      </li>
+    </ol>
+  </div>
+
+  <div class="landing-section" aria-label="O que o Robô Financeiro faz">
+    <h2>O que o Robô Financeiro faz</h2>
+    <div class="feature-grid">
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">💸</span>
+        <h3>Gastos mensais</h3>
+        <p>Registre cada gasto falando no chat e acompanhe o total do mês.</p>
+      </article>
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">💳</span>
+        <h3>Faturas de cartão</h3>
+        <p>Anote a fatura, o cartão e o vencimento. Ela aparece separada no resumo.</p>
+      </article>
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">🧾</span>
+        <h3>Contas e dívidas</h3>
+        <p>Contas a pagar e dívidas em aberto, com vencimento e status.</p>
+      </article>
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">🎯</span>
+        <h3>Orçamento e saldo</h3>
+        <p>Veja quanto entrou, quanto saiu e quanto sobrou no mês.</p>
+      </article>
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">📊</span>
+        <h3>Resumo do mês</h3>
+        <p>Totais e lista de registros, com botão de excluir, mês a mês.</p>
+      </article>
+      <article class="feature-card">
+        <span class="feature-emoji" aria-hidden="true">🔒</span>
+        <h3>Só seus dados</h3>
+        <p>Seus registros ficam salvos na sua conta e só você vê.</p>
+      </article>
+    </div>
+  </div>
+
+  <div class="landing-section" aria-label="Preço">
+    <h2>Preço simples, sem surpresa</h2>
+    <div class="plan-grid">
+      <article class="plan-card">
+        <h3>Teste de 1 dia</h3>
+        <p class="plan-price">R$ 1,99</p>
+        <p class="plan-period">1 dia de acesso completo</p>
+        <ul>
+          <li>Conversa com o Robô Financeiro</li>
+          <li>Registro de gastos, faturas e dívidas</li>
+          <li>Resumo do mês e orçamento</li>
+        </ul>
+        <button class="btn btn-outline btn-block js-go-signup" type="button">Começar com o teste</button>
+      </article>
+      <article class="plan-card plan-card-featured">
+        <span class="plan-badge">Mais escolhido</span>
+        <h3>Assinatura mensal</h3>
+        <p class="plan-price">R$ 19,90<span class="plan-per">/mês</span></p>
+        <p class="plan-period">30 dias de acesso completo</p>
+        <ul>
+          <li>Conversa com o Robô Financeiro</li>
+          <li>Registro de gastos, faturas e dívidas</li>
+          <li>Resumo do mês e orçamento</li>
+          <li>Renove quando quiser por mais 30 dias</li>
+        </ul>
+        <button class="btn btn-gold btn-block js-go-signup" type="button">Criar conta</button>
+      </article>
+    </div>
+    <p class="pay-note">Pagamento avulso por período via Pix. Sem débito automático: quando vencer, você renova se quiser.</p>
+  </div>
+
+  <div class="landing-section" aria-label="Perguntas frequentes">
+    <h2>Perguntas frequentes</h2>
+    <details class="faq-item">
+      <summary>Meus registros ficam salvos? Só eu vejo?</summary>
+      <p>Sim. Tudo o que você conta ao Robô Financeiro fica salvo na sua conta e só você vê. Outros usuários não têm acesso aos seus dados.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Preciso de cartão de crédito para assinar?</summary>
+      <p>Não. O pagamento é via Pix, avulso por período. Sem débito automático: quando vencer, você renova se quiser.</p>
+    </details>
+    <details class="faq-item">
+      <summary>O robô dá recomendação de investimento?</summary>
+      <p>Não. Ele organiza seus gastos e faturas, calcula totais e saldo e simula cenários de forma educativa. Não recomenda investimentos.</p>
+    </details>
+    <details class="faq-item">
+      <summary>E se eu não renovar?</summary>
+      <p>Nada é cobrado de novo: não há débito automático. Seus registros continuam salvos e você volta a ver tudo ao renovar.</p>
+    </details>
+  </div>
+
+  <section id="authSection" class="landing-auth" aria-label="Entrar ou criar conta">
   <div class="auth-card">
     <div class="auth-brand">
       <span class="robot-avatar robot-avatar-lg" aria-hidden="true">
@@ -50,6 +179,12 @@
 
     <p class="auth-note">Teste de 1 dia por <strong>R$ 1,99</strong> · Assinatura <strong>R$ 19,90/mês</strong> · Pagamento via Pix</p>
   </div>
+  </section>
+
+  <footer class="landing-footer">
+    <p><strong>Assistente Financeiro</strong> · Robô Financeiro — organize gastos, faturas e dívidas conversando.</p>
+    <p>Pagamento via Pix · Sem débito automático</p>
+  </footer>
 </section>
 
 <!-- ============ TELA DE PLANOS / ACESSO ============ -->
