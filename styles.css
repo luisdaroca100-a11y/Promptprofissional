@@ -1,4 +1,4 @@
-/* Gerador de Prompts — tema escuro profissional, acento dourado */
+/* Assistente Financeiro — tema escuro profissional, acento dourado */
 :root {
   --bg: #050505;
   --bg-soft: #0d0d0d;
@@ -264,33 +264,73 @@ input, textarea { font: inherit; color: var(--text); }
 }
 .mode-chip.active { background: var(--gold-soft); color: var(--gold); border-color: #6b5400; }
 
-/* Painel do prompt final */
-.final-panel {
+/* Painel do resumo do mês */
+.finance-panel {
   margin: 12px 16px 0;
   background: var(--panel);
   border: 1px solid #6b5400;
   border-radius: var(--radius);
   padding: 14px;
+  max-width: var(--maxw);
+  width: calc(100% - 32px);
+  align-self: center;
 }
-.final-panel-head { display: flex; align-items: center; gap: 10px; }
-.final-tabs { display: flex; gap: 6px; margin-left: 8px; }
-.final-tab {
-  background: transparent; border: 1px solid var(--border); color: var(--muted);
-  border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600;
-}
-.final-tab.active { color: var(--gold); border-color: #6b5400; background: var(--gold-soft); }
-.final-panel-head .icon-btn { margin-left: auto; }
-.final-text {
-  white-space: pre-wrap; word-break: break-word;
+.finance-head { display: flex; align-items: center; gap: 10px; }
+.finance-head strong { font-size: 16px; }
+.month-select {
+  margin-left: auto;
   background: var(--bg-soft);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px;
-  font-size: 14px;
-  max-height: 260px;
-  overflow-y: auto;
-  margin: 12px 0;
+  padding: 7px 10px;
+  outline: none;
 }
+.month-select:focus { border-color: var(--gold); }
+.finance-warning {
+  background: #2a0d0d;
+  border: 1px solid #5b1a1a;
+  color: #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin: 12px 0 0;
+}
+.finance-totals {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.finance-total {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.finance-total span { font-size: 12px; color: var(--muted); }
+.finance-total strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finance-saldo { border-color: #6b5400; }
+.finance-saldo strong { color: var(--gold); }
+.finance-total strong.negative { color: var(--red); }
+.finance-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.finance-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.finance-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.finance-item-main strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finance-item-main span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finance-item-value { font-size: 14px; white-space: nowrap; }
+.finance-item-value.positive { color: var(--green); }
+.finance-delete { color: var(--muted); }
+.finance-delete:hover { color: var(--red); }
+.finance-empty { color: var(--muted); font-size: 13.5px; margin: 12px 0 0; }
 
 /* Mensagens */
 .messages {
@@ -426,6 +466,7 @@ input, textarea { font: inherit; color: var(--text); }
   .sidebar-top .icon-btn { display: inline-block; }
   .chat-header .icon-btn#sidebarOpen { display: inline-block; }
   .bubble { max-width: 86%; }
+  .finance-totals { grid-template-columns: repeat(2, 1fr); }
   .chat-header .btn-gold { padding: 8px 10px; font-size: 13px; }
   .auth-card { padding: 22px 18px; }
 }

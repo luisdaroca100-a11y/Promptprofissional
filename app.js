@@ -1,4 +1,4 @@
-// Gerador de Prompts — frontend (chat com o Robô dos Prompts).
+// Assistente Financeiro — frontend (chat com o Robô Financeiro).
 // O navegador fala SOMENTE com /api/* deste site e com o Supabase Auth
 // (login e tabelas, protegidas por RLS). Nenhuma chave de IA ou de
 // pagamento passa pelo navegador.
@@ -22,13 +22,14 @@ let supabase = null;
 let session = null;
 let me = null;
 let currentConversationId = null;
-// Modo interno fixo: sem botões de escolha — o robô interpreta pelo
-// texto do cliente se é foto, vídeo ou edição.
+// Modo interno fixo (legado da tabela conversations, que exige um
+// valor válido): o robô interpreta tudo pelo texto do usuário.
 let currentMode = 'foto';
-let currentFinal = { pt: '', en: '' };
 let currentPaymentId = null;
 let authMode = 'login';
 let sending = false;
+let financeMonth = new Date().toISOString().slice(0, 7);
+let financeLoading = false;
 
 function escapeHtml(s) {
   return String(s)
@@ -118,11 +119,13 @@ async function route() {
     const until = new Date(me.access.expiresAt).toLocaleDateString('pt-BR');
     const planName = me.access.plan === 'trial' ? 'Teste de 1 dia' : 'Assinatura mensal';
     $('accessLabel').textContent = planName + ' · válido até ' + until;
-    $('usageLabel').textContent = 'Prompts hoje: ' + me.usage.used + '/' + me.usage.limit;
+    $('usageLabel').textContent = 'Mensagens hoje: ' + me.usage.used + '/' + me.usage.limit;
     showView('app');
+    buildMonthOptions();
     await loadConversations();
+    await loadFinanceSummary();
   } else {
-    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com o Robô dos Prompts.';
+    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com o Robô Financeiro.';
     $('pixArea').hidden = true;
     showView('pay');
   }
@@ -234,7 +237,6 @@ async function newConversation(mode) {
   currentMode = mode;
   $('messages').innerHTML = '';
   renderWelcome();
-  $('finalPanel').hidden = true;
   await loadConversations();
   $('sidebar').classList.remove('open');
   return data.id;
@@ -243,7 +245,6 @@ async function newConversation(mode) {
 async function openConversation(id, mode) {
   currentConversationId = id;
   currentMode = mode || 'foto';
-  $('finalPanel').hidden = true;
   const { data } = await supabase
     .from('messages')
     .select('role, content, created_at')
@@ -267,9 +268,9 @@ function renderWelcome() {
   card.className = 'message-row assistant';
   card.innerHTML =
     '<span class="robot-avatar robot-avatar-sm" aria-hidden="true">' + ROBOT_SVG + '</span>' +
-    '<div class="welcome-card"><h2>Olá! Eu sou o Robô dos Prompts 🤖</h2>' +
-    '<p>Me conte o que você quer criar — uma foto, um vídeo ou uma edição. Eu vou perguntando o que falta, lembrando de tudo que você disser e refinando o prompt com você.</p>' +
-    '<p>Quando estiver pronto, toque em <strong>✨ Gerar prompt final</strong> e eu entrego o prompt em português e em inglês, pronto para copiar.</p></div>';
+    '<div class="welcome-card"><h2>Olá! Eu sou o Robô Financeiro 🤖</h2>' +
+    '<p>Me conte seus gastos, ganhos, faturas de cartão, contas e dívidas — por exemplo: "Gastei R$ 120 no mercado hoje" ou "Minha fatura do cartão fechou em R$ 850, vence dia 10". Eu registro tudo, lembro da conversa e mostro o resumo do mês no painel acima.</p>' +
+    '<p>Quando quiser registrar, é só dizer "registra" ou "anota aí" que eu anoto na hora, sem mais perguntas.</p></div>';
   box.appendChild(card);
   scrollMessages();
 }
@@ -302,7 +303,7 @@ function setTyping(on) {
 
 // ---------- Envio de mensagens ----------
 
-async function sendMessage(text, { final = false } = {}) {
+async function sendMessage(text) {
   if (sending) return;
   const content = String(text || '').trim();
   if (!content) return;
@@ -340,14 +341,19 @@ async function sendMessage(text, { final = false } = {}) {
   try {
     const data = await api('/api/chat', {
       method: 'POST',
-      body: { conversationId: currentConversationId, message: content, final },
+      body: { conversationId: currentConversationId, message: content },
     });
     setTyping(false);
     appendMessage('assistant', data.reply);
     if (data.usage) {
-      $('usageLabel').textContent = 'Prompts hoje: ' + data.usage.used + '/' + data.usage.limit;
+      $('usageLabel').textContent = 'Mensagens hoje: ' + data.usage.used + '/' + data.usage.limit;
     }
-    if (final) showFinalPanel(data.reply);
+    // Novo registro salvo: volta o painel para o mês atual e atualiza.
+    if (data.finance && data.finance.saved > 0) {
+      financeMonth = new Date().toISOString().slice(0, 7);
+      $('monthSelect').value = financeMonth;
+      await loadFinanceSummary();
+    }
   } catch (err) {
     setTyping(false);
     if (err.needsAccess) {
@@ -362,31 +368,116 @@ async function sendMessage(text, { final = false } = {}) {
   }
 }
 
-// ---------- Painel do prompt final ----------
+// ---------- Resumo do mês ----------
 
-function parseFinalPrompt(reply) {
-  const ptMatch = reply.match(/---PROMPT_PT---([\s\S]*?)(?:---PROMPT_EN---|---END---|$)/);
-  const enMatch = reply.match(/---PROMPT_EN---([\s\S]*?)(?:---END---|$)/);
-  return {
-    pt: ptMatch ? ptMatch[1].trim() : reply.trim(),
-    en: enMatch ? enMatch[1].trim() : '',
-  };
+function monthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function showFinalPanel(reply) {
-  currentFinal = parseFinalPrompt(reply);
-  setFinalTab('pt');
-  $('finalPanel').hidden = false;
-  $('finalPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function previousMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));
+  return d.toISOString().slice(0, 7);
 }
 
-function setFinalTab(which) {
-  $('tabPt').classList.toggle('active', which === 'pt');
-  $('tabEn').classList.toggle('active', which === 'en');
-  $('finalText').textContent =
-    which === 'pt'
-      ? currentFinal.pt
-      : (currentFinal.en || 'A versão em inglês não veio nesta resposta. Peça ao Robô dos Prompts para gerar o prompt final de novo.');
+function buildMonthOptions() {
+  const select = $('monthSelect');
+  select.innerHTML = '';
+  let ym = new Date().toISOString().slice(0, 7);
+  for (let i = 0; i < 2; i++) {
+    const opt = document.createElement('option');
+    opt.value = ym;
+    opt.textContent = monthLabel(ym);
+    select.appendChild(opt);
+    ym = previousMonth(ym);
+  }
+  select.value = financeMonth;
+}
+
+function formatDateBR(iso) {
+  const parts = String(iso || '').split('-');
+  return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : iso;
+}
+
+const TIPO_LABEL = {
+  gasto: 'Gasto',
+  ganho: 'Ganho',
+  fatura: 'Fatura',
+  conta: 'Conta',
+  divida: 'Dívida',
+};
+
+async function loadFinanceSummary() {
+  if (financeLoading) return;
+  financeLoading = true;
+  try {
+    const data = await api('/api/finance?month=' + encodeURIComponent(financeMonth), { method: 'GET' });
+    if (data.needsSql) {
+      showError($('financeWarning'), data.message || 'Falta rodar o SQL novo da tabela finance_entries no Supabase.');
+    } else {
+      showError($('financeWarning'), '');
+    }
+    const t = data.totals || {};
+    $('totalGanhos').textContent = formatBRL(t.ganhos || 0);
+    $('totalGastos').textContent = formatBRL(t.gastos || 0);
+    $('totalFaturas').textContent = formatBRL(t.faturas || 0);
+    $('totalDividas').textContent = formatBRL(t.dividas || 0);
+    $('totalSaldo').textContent = formatBRL(t.saldo || 0);
+    $('totalSaldo').classList.toggle('negative', (t.saldo || 0) < 0);
+    renderFinanceList(data.entries || []);
+  } catch (err) {
+    showError($('financeWarning'), err.message || 'Não foi possível carregar o resumo.');
+  } finally {
+    financeLoading = false;
+  }
+}
+
+function renderFinanceList(entries) {
+  const list = $('financeList');
+  list.innerHTML = '';
+  $('financeEmpty').hidden = entries.length > 0;
+  for (const e of entries) {
+    const li = document.createElement('li');
+    li.className = 'finance-item';
+    const main = document.createElement('div');
+    main.className = 'finance-item-main';
+    const desc = document.createElement('strong');
+    desc.textContent = e.descricao;
+    const meta = document.createElement('span');
+    const parts = [TIPO_LABEL[e.tipo] || e.tipo, formatDateBR(e.data)];
+    if (e.categoria) parts.push(e.categoria);
+    if (e.cartao) parts.push('cartão ' + e.cartao);
+    if (e.vencimento) parts.push('vence ' + formatDateBR(e.vencimento));
+    if (e.pago) parts.push('pago');
+    meta.textContent = parts.join(' · ');
+    main.appendChild(desc);
+    main.appendChild(meta);
+    const value = document.createElement('strong');
+    value.className = 'finance-item-value' + (e.tipo === 'ganho' ? ' positive' : '');
+    value.textContent = (e.tipo === 'ganho' ? '+' : '−') + ' ' + formatBRL(e.valor);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-ghost icon-btn finance-delete';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Excluir registro ' + e.descricao);
+    del.addEventListener('click', () => deleteFinanceEntry(e.id, e.descricao));
+    li.appendChild(main);
+    li.appendChild(value);
+    li.appendChild(del);
+    list.appendChild(li);
+  }
+}
+
+async function deleteFinanceEntry(id, descricao) {
+  if (!window.confirm('Excluir "' + descricao + '" do resumo?')) return;
+  try {
+    await api('/api/finance?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    await loadFinanceSummary();
+  } catch (err) {
+    showError($('financeWarning'), err.message);
+  }
 }
 
 async function copyText(text, feedbackBtn) {
@@ -433,15 +524,13 @@ function bindChat() {
     }
   });
 
-  $('finalPromptBtn').addEventListener('click', () => {
-    sendMessage('Gere o prompt final com tudo que conversamos.', { final: true });
+  $('financeToggleBtn').addEventListener('click', () => {
+    $('financePanel').hidden = !$('financePanel').hidden;
   });
-  $('tabPt').addEventListener('click', () => setFinalTab('pt'));
-  $('tabEn').addEventListener('click', () => setFinalTab('en'));
-  $('finalPanelClose').addEventListener('click', () => { $('finalPanel').hidden = true; });
-  $('finalCopy').addEventListener('click', () => {
-    const which = $('tabEn').classList.contains('active') ? 'en' : 'pt';
-    copyText(which === 'pt' ? currentFinal.pt : currentFinal.en, $('finalCopy'));
+  $('financeRefresh').addEventListener('click', loadFinanceSummary);
+  $('monthSelect').addEventListener('change', () => {
+    financeMonth = $('monthSelect').value;
+    loadFinanceSummary();
   });
 }
 

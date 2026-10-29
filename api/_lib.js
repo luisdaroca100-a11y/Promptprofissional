@@ -119,8 +119,8 @@ function parseBody(req) {
 // ---------- Planos e concessão de acesso (pagamentos) ----------
 
 const PLANS = {
-  trial: { amount: 1.99, days: 1, label: 'Gerador de Prompts — Teste de 1 dia' },
-  monthly: { amount: 19.9, days: 30, label: 'Gerador de Prompts — Assinatura mensal' },
+  trial: { amount: 1.99, days: 1, label: 'Assistente Financeiro — Teste de 1 dia' },
+  monthly: { amount: 19.9, days: 30, label: 'Assistente Financeiro — Assinatura mensal' },
 };
 
 function addDays(date, days) {

@@ -1,10 +1,14 @@
-# Gerador de Prompts — Robô dos Prompts
+# Assistente Financeiro — Robô Financeiro
 
-Site de gerador de prompts em formato de **conversa**: o usuário descreve o que quer
-(foto, vídeo, edição de foto ou edição de vídeo), o assistente lembra da conversa
-**inteira** e refina o prompt a cada resposta, sem repetir modelos genéricos.
-O usuário pode pedir o prompt final a qualquer momento e recebe a versão em
-português **e** em inglês, com botões de copiar.
+Site assistente de **finanças pessoais** em formato de **conversa**: o
+usuário conta seus gastos, ganhos, faturas de cartão, contas e dívidas, o
+Robô Financeiro **registra tudo** no banco, lembra da conversa **inteira**
+e mostra o **resumo do mês** (ganhos, gastos, faturas de cartão, dívidas
+em aberto e saldo) num painel, com lista de registros e botão de excluir.
+
+O robô organiza e calcula — não promete rentabilidade nem dá
+recomendação de investimento personalizada; explica conceitos e simula
+cenários de forma educativa.
 
 Modelo de negócio (v1): assinatura com pagamento avulso por período via **Pix
 (Mercado Pago)** — sem débito automático.
@@ -16,20 +20,21 @@ Repositório: **https://github.com/luisdaroca100-a11y/Promptprofissional**
 
 Arquitetura: frontend estático (`index.html` + `app.js` + `styles.css`, sem
 build) + funções serverless Node na Vercel (`api/`). O navegador fala SOMENTE
-com `/api/*` e com o Supabase Auth — a chave do Gemini e o token do Mercado
+com `/api/*` e com o Supabase Auth — a chave da IA e o token do Mercado
 Pago ficam **só no servidor**, lidos de variáveis de ambiente. Nenhuma chave
 está no código.
 
 ## Estrutura
 
 ```
-index.html                 Frontend: login, chat, planos/Pix
+index.html                 Frontend: login, chat, resumo do mês, planos/Pix
 styles.css                 Tema escuro profissional, acento dourado
-app.js                     Lógica do chat, conversas, pagamento Pix
+app.js                     Lógica do chat, conversas, resumo do mês, pagamento Pix
 api/_lib.js                Helpers (Supabase REST, auth, acesso, uso)
 api/config.js              Config pública (URL + anon key do Supabase)
 api/me.js                  Usuário atual + acesso + uso do dia
-api/chat.js                Proxy de IA — Groq (se GROQ_API_KEY existir) com fallback pro Gemini; memória total da conversa
+api/chat.js                Proxy de IA — Groq (se GROQ_API_KEY existir) com fallback pro Gemini; memória total da conversa; extrai blocos ---REGISTRO--- e salva em finance_entries
+api/finance.js             Resumo do mês (GET) + excluir registro (DELETE)
 api/mp-create-payment.js   Cria Pix + verifica pagamento já feito
 api/mp-webhook.js          Webhook do Mercado Pago (libera acesso)
 supabase.sql               Schema completo (tabelas + RLS + trigger)
@@ -42,12 +47,38 @@ O projeto Supabase já existe. Rode o arquivo `supabase.sql` inteiro no
 **SQL Editor** do projeto (Dashboard > SQL Editor > New query > colar > Run).
 
 Ele cria: `profiles`, `user_access`, `usage`, `conversations`, `messages`,
-`processed_payments`, com RLS ativado (cada usuário só vê os próprios dados)
-e um trigger que cria o perfil ao cadastrar.
+`processed_payments` e `finance_entries`, com RLS ativado (cada usuário só
+vê os próprios dados) e um trigger que cria o perfil ao cadastrar.
+
+> Quem **já rodou** o `supabase.sql` antes (na época do gerador de prompts)
+> precisa rodar **só o trecho final** marcado `NOVO (Assistente Financeiro)`:
+> ele cria apenas a tabela `finance_entries`. Sem ela, o chat avisa que não
+> conseguiu salvar os registros (nada se perde em silêncio) e o painel de
+> resumo mostra o aviso de SQL pendente.
 
 > Em **Authentication > Providers**, deixe o provedor **Email** ativado.
 > Em **Authentication > URL Configuration**, ajuste o **Site URL** para o
-> domínio final do site na Vercel (ex.: `https://promptprofissional.vercel.app`).
+> domínio final do site na Vercel (ex.: `https://promptprofissional7gg6.vercel.app`).
+
+### Tabela finance_entries
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | gerado automaticamente |
+| `user_id` | uuid | dono do registro (`auth.users`) |
+| `tipo` | text | `gasto`, `ganho`, `fatura`, `conta` ou `divida` |
+| `descricao` | text | ex.: "Mercado", "Fatura Nubank" |
+| `valor` | numeric(12,2) | valor em R$ |
+| `categoria` | text | ex.: mercado, moradia, cartão |
+| `data` | date | data do gasto/ganho |
+| `cartao` | text/null | nome do cartão (fatura/gasto no cartão) |
+| `vencimento` | date/null | vencimento (fatura/conta/dívida) |
+| `pago` | boolean | padrão `false` |
+| `created_at` | timestamptz | criação do registro |
+
+O resumo do mês soma: **ganhos** (`ganho`), **gastos** (`gasto` + `conta`),
+**faturas** (`fatura`, separadas para não contar duas vezes) e **dívidas em
+aberto** (`divida` não paga, fora do saldo). Saldo = ganhos − gastos − faturas.
 
 ## 2. IA — Groq (teste gratuito) ou Gemini (Google AI Studio)
 
@@ -67,6 +98,17 @@ https://aistudio.google.com/apikey (modelo usado: `gemini-3.8-flash`).
 A cota gratuita do Gemini é compartilhada entre todos os usuários do site;
 se o volume crescer, ative o faturamento (billing) no Google Cloud do
 projeto da chave — o código não muda.
+
+### Como o registro funciona
+
+Quando o usuário relata um gasto, ganho, fatura, conta ou dívida, a IA
+emite um bloco `---REGISTRO--- {json} ---END---` no fim da resposta. O
+servidor (`api/chat.js`) extrai o bloco, valida os campos, insere na
+tabela `finance_entries` via service-role key, **remove o bloco JSON da
+resposta visível** e confirma numa frase curta o que foi salvo. Se a
+inserção falhar, a resposta diz claramente que não conseguiu salvar e
+que falta rodar o SQL novo — o registro aparece na mensagem para não se
+perder.
 
 ## 3. Mercado Pago (Pix)
 
@@ -110,23 +152,30 @@ projeto da chave — o código não muda.
 
 ## 5. Como testar (fluxo completo)
 
-1. Abra o site, crie uma conta com e-mail e senha.
-2. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
+1. Rode o trecho novo do `supabase.sql` (tabela `finance_entries`) no SQL
+   Editor do Supabase.
+2. Abra o site, crie uma conta com e-mail e senha.
+3. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
    (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.
-3. Converse com o Robô dos Prompts: descreva o que quer, responda às
-   perguntas dele e toque em **“✨ Gerar prompt final”** para ver o
-   prompt em PT + EN com botão de copiar.
-4. Feche e reabra o navegador: o histórico da conversa continua lá
-   (fica no banco, não só no aparelho).
-5. Para renovar, a tela de planos reaparece ao vencer — pague de novo
+4. Converse com o Robô Financeiro: diga, por exemplo, "Gastei R$ 120 no
+   mercado hoje, registra" — ele confirma o registro e o painel **Resumo
+   do mês** mostra o gasto e o saldo atualizados.
+5. Diga "Minha fatura do cartão fechou em R$ 850, vence dia 10" e veja a
+   fatura separada no resumo. Use o ✕ para excluir um registro.
+6. Feche e reabra o navegador: o histórico da conversa e os registros
+   continuam lá (ficam no banco, não só no aparelho).
+7. Para renovar, a tela de planos reaparece ao vencer — pague de novo
    e o acesso estende 30 dias.
 
 ## Limites e regras (v1)
 
-- **Limite diário:** 50 prompts por usuário/dia (constante `DAILY_LIMIT`
+- **Limite diário:** 50 mensagens por usuário/dia (constante `DAILY_LIMIT`
   em `api/chat.js` e `api/me.js`). Ajuste o número nas duas constantes.
 - **Memória:** o backend envia o histórico completo da conversa à IA
   (Groq ou Gemini) a cada turno (limitado às últimas 200 mensagens por conversa).
+- **Registro:** só é salvo quando a IA emite o bloco `---REGISTRO---`
+  válido; falha de gravação vira aviso claro na resposta, nunca perda
+  silenciosa.
 - **Teste único:** cada conta só pode comprar o teste de R$ 1,99 uma vez
   (verificado em `processed_payments`).
 - **Webhook idempotente:** notificações duplicadas do mesmo `payment_id`

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Gerador de Prompts — Robô dos Prompts</title>
-<meta name="description" content="Converse com o Robô dos Prompts e crie prompts profissionais para fotos, vídeos e edições. Ele lembra de toda a conversa e refina o prompt com você.">
+<title>Assistente Financeiro — Robô Financeiro</title>
+<meta name="description" content="Converse com o Robô Financeiro e organize suas finanças pessoais: gastos mensais, faturas de cartão, contas, dívidas e orçamento. Ele registra tudo e mostra o resumo do mês.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -26,8 +26,8 @@
           <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
         </svg>
       </span>
-      <h1>Gerador de Prompts</h1>
-      <p class="auth-tagline">Converse com o <strong>Robô dos Prompts</strong> e crie prompts profissionais para fotos, vídeos e edições. Ele lembra de toda a conversa e refina o prompt com você.</p>
+      <h1>Assistente Financeiro</h1>
+      <p class="auth-tagline">Converse com o <strong>Robô Financeiro</strong> e organize suas finanças: gastos mensais, faturas de cartão, contas, dívidas e orçamento. Ele registra tudo e mostra o resumo do mês.</p>
     </div>
 
     <div class="auth-tabs" role="tablist">
@@ -71,7 +71,7 @@
       </span>
       <div>
         <h1>Ative seu acesso</h1>
-        <p id="payHello">Olá! Escolha um plano para conversar com o Robô dos Prompts.</p>
+        <p id="payHello">Olá! Escolha um plano para conversar com o Robô Financeiro.</p>
       </div>
       <button id="payLogout" class="btn btn-ghost" type="button">Sair</button>
     </div>
@@ -83,8 +83,8 @@
         <p class="plan-period">1 dia de acesso completo</p>
         <ul>
           <li>Conversa com memória total</li>
-          <li>Foto, vídeo e edições</li>
-          <li>Prompt final em PT + EN</li>
+          <li>Registro de gastos, faturas e dívidas</li>
+          <li>Resumo do mês e orçamento</li>
         </ul>
         <button class="btn btn-outline btn-block" type="button" data-plan="trial">Pagar com Pix — R$ 1,99</button>
       </article>
@@ -96,8 +96,8 @@
         <p class="plan-period">30 dias de acesso completo</p>
         <ul>
           <li>Conversa com memória total</li>
-          <li>Foto, vídeo e edições</li>
-          <li>Prompt final em PT + EN</li>
+          <li>Registro de gastos, faturas e dívidas</li>
+          <li>Resumo do mês e orçamento</li>
           <li>Renove quando quiser por mais 30 dias</li>
         </ul>
         <button class="btn btn-gold btn-block" type="button" data-plan="monthly">Pagar com Pix — R$ 19,90</button>
@@ -140,7 +140,7 @@
           <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
         </svg>
       </span>
-      <strong class="sidebar-brand">Robô dos Prompts</strong>
+      <strong class="sidebar-brand">Robô Financeiro</strong>
       <button id="sidebarClose" class="btn btn-ghost icon-btn" type="button" aria-label="Fechar menu">✕</button>
     </div>
     <button id="newChatBtn" class="btn btn-gold btn-block" type="button">+ Nova conversa</button>
@@ -171,25 +171,30 @@
         </svg>
       </span>
       <div class="chat-identity">
-        <strong>Robô dos Prompts</strong>
-        <span class="online-status"><span class="online-dot"></span>Online · lembra de toda a conversa</span>
+        <strong>Robô Financeiro</strong>
+        <span class="online-status"><span class="online-dot"></span>Online · registra seus gastos e mostra o resumo</span>
       </div>
-      <button id="finalPromptBtn" class="btn btn-gold" type="button">✨ Gerar prompt final</button>
+      <button id="financeToggleBtn" class="btn btn-gold" type="button">💰 Resumo do mês</button>
     </header>
 
-    <!-- Painel do prompt final -->
-    <div id="finalPanel" class="final-panel" hidden>
-      <div class="final-panel-head">
-        <strong>Prompt final</strong>
-        <div class="final-tabs" role="tablist">
-          <button id="tabPt" class="final-tab active" type="button">Português</button>
-          <button id="tabEn" class="final-tab" type="button">English</button>
-        </div>
-        <button id="finalPanelClose" class="btn btn-ghost icon-btn" type="button" aria-label="Fechar painel">✕</button>
+    <!-- Painel do resumo do mês -->
+    <section id="financePanel" class="finance-panel" aria-label="Resumo do mês">
+      <div class="finance-head">
+        <strong>Resumo do mês</strong>
+        <select id="monthSelect" class="month-select" aria-label="Mês do resumo"></select>
+        <button id="financeRefresh" class="btn btn-ghost icon-btn" type="button" aria-label="Atualizar resumo">↻</button>
       </div>
-      <pre id="finalText" class="final-text"></pre>
-      <button id="finalCopy" class="btn btn-gold" type="button">Copiar prompt</button>
-    </div>
+      <p id="financeWarning" class="finance-warning" hidden></p>
+      <div class="finance-totals">
+        <div class="finance-total"><span>Ganhos</span><strong id="totalGanhos">R$ 0,00</strong></div>
+        <div class="finance-total"><span>Gastos</span><strong id="totalGastos">R$ 0,00</strong></div>
+        <div class="finance-total"><span>Faturas de cartão</span><strong id="totalFaturas">R$ 0,00</strong></div>
+        <div class="finance-total"><span>Dívidas em aberto</span><strong id="totalDividas">R$ 0,00</strong></div>
+        <div class="finance-total finance-saldo"><span>Saldo do mês</span><strong id="totalSaldo">R$ 0,00</strong></div>
+      </div>
+      <ul id="financeList" class="finance-list"></ul>
+      <p id="financeEmpty" class="finance-empty">Nenhum registro neste mês ainda. Conte ao Robô Financeiro, por exemplo: "Gastei R$ 120 no mercado hoje."</p>
+    </section>
 
     <!-- Mensagens -->
     <div id="messages" class="messages" aria-live="polite"></div>
@@ -209,17 +214,17 @@
           <rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/>
         </svg>
       </span>
-      <span class="typing-bubble" aria-label="O Robô dos Prompts está digitando"><span></span><span></span><span></span></span>
+      <span class="typing-bubble" aria-label="O Robô Financeiro está digitando"><span></span><span></span><span></span></span>
     </div>
 
     <p id="chatError" class="form-error chat-error" role="alert" hidden></p>
 
     <!-- Composer -->
     <form id="composer" class="composer">
-      <textarea id="composerInput" rows="1" placeholder="Descreva o que você quer criar…" aria-label="Sua mensagem"></textarea>
+      <textarea id="composerInput" rows="1" placeholder="Ex.: Gastei R$ 120 no mercado hoje…" aria-label="Sua mensagem"></textarea>
       <button id="sendBtn" class="btn btn-gold send-btn" type="submit" aria-label="Enviar mensagem">➤</button>
     </form>
-    <p class="composer-hint">O Robô dos Prompts lembra de tudo que você disser nesta conversa e refina o prompt a cada resposta.</p>
+    <p class="composer-hint">O Robô Financeiro lembra da conversa, registra seus gastos e faturas e mostra o resumo do mês.</p>
   </main>
 </section>
 

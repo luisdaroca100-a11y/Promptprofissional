@@ -1,13 +1,18 @@
 -- ============================================================
--- GERADOR DE PROMPTS — Schema do Supabase
+-- ASSISTENTE FINANCEIRO (Robô Financeiro) — Schema do Supabase
 -- Rode este arquivo inteiro no SQL Editor do Supabase
 -- (Dashboard do projeto > SQL Editor > New query > colar > Run)
+--
+-- Quem JÁ rodou este arquivo antes: rode SÓ o trecho final marcado
+-- "NOVO (Assistente Financeiro)" — ele só cria a tabela
+-- finance_entries (o resto usa "if not exists" e não muda nada).
 --
 -- Variáveis de ambiente que o app precisa na Vercel:
 --   SUPABASE_URL           (URL do projeto — Settings > API)
 --   SUPABASE_ANON_KEY      (chave anon/public — Settings > API)
 --   SUPABASE_SERVICE_ROLE_KEY (chave service_role — Settings > API, SÓ no servidor)
---   GEMINI_API_KEY         (chave do Google AI Studio — SÓ no servidor)
+--   GEMINI_API_KEY         (chave do Google AI Studio — SÓ no servidor, fallback)
+--   GROQ_API_KEY           (chave da Groq — SÓ no servidor, provedor principal)
 --   MP_ACCESS_TOKEN        (access token do Mercado Pago — SÓ no servidor)
 -- NENHUMA chave vai para o código. Todas são lidas de process.env.
 -- ============================================================
@@ -155,3 +160,47 @@ create index if not exists idx_conversations_user_created
   on public.conversations (user_id, created_at desc);
 create index if not exists idx_processed_payments_user
   on public.processed_payments (user_id, created_at desc);
+
+-- ============================================================
+-- NOVO (Assistente Financeiro, 2026-10-29) — RODE SÓ ESTE TRECHO
+-- se você já rodou este arquivo antes. Ele só cria a tabela
+-- finance_entries (registros do Robô Financeiro) e suas políticas.
+-- Quem nunca rodou o arquivo pode rodar o arquivo inteiro.
+-- Sem esta tabela, o chat avisa que não conseguiu salvar os registros.
+-- ============================================================
+
+create table if not exists public.finance_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  tipo text not null check (tipo in ('gasto', 'ganho', 'fatura', 'conta', 'divida')),
+  descricao text not null,
+  valor numeric(12, 2) not null,
+  categoria text,
+  data date not null,
+  cartao text,
+  vencimento date,
+  pago boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.finance_entries enable row level security;
+
+-- finance_entries: CRUD só dos próprios registros
+drop policy if exists "finance_entries_select_own" on public.finance_entries;
+create policy "finance_entries_select_own" on public.finance_entries
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "finance_entries_insert_own" on public.finance_entries;
+create policy "finance_entries_insert_own" on public.finance_entries
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "finance_entries_update_own" on public.finance_entries;
+create policy "finance_entries_update_own" on public.finance_entries
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "finance_entries_delete_own" on public.finance_entries;
+create policy "finance_entries_delete_own" on public.finance_entries
+  for delete using (auth.uid() = user_id);
+
+create index if not exists idx_finance_entries_user_data
+  on public.finance_entries (user_id, data desc);
