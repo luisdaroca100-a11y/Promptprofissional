@@ -1,4 +1,4 @@
-// Controlador do overlay do chat do Robô Financeiro (só o assistente).
+// Controlador do overlay do chat da Secretária (só a assistente).
 // Sem dependências: opera apenas sobre os elementos recebidos, para ser
 // testável em Node com elementos falsos (fakes). O overlay é uma camada
 // por cima da tela inicial (resumo do mês): abrir mostra o chat e foca o

@@ -1,4 +1,4 @@
-// Assistente Financeiro — frontend (chat com o Robô Financeiro).
+// Assistente Financeiro — frontend (chat com a Secretária).
 // O navegador fala SOMENTE com /api/* deste site e com o Supabase Auth
 // (login e tabelas, protegidas por RLS). Nenhuma chave de IA ou de
 // pagamento passa pelo navegador.
@@ -7,24 +7,14 @@ import { createChatOverlay } from './chat-overlay.js';
 
 const $ = (id) => document.getElementById(id);
 
-const ROBOT_SVG =
-  '<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-  '<line x1="32" y1="4" x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
-  '<circle cx="32" cy="4" r="3.5" fill="#f5b301"/>' +
-  '<rect x="10" y="14" width="44" height="34" rx="10" fill="#1c1c1c" stroke="currentColor" stroke-width="2.5"/>' +
-  '<rect x="4" y="26" width="6" height="12" rx="3" fill="currentColor"/>' +
-  '<rect x="54" y="26" width="6" height="12" rx="3" fill="currentColor"/>' +
-  '<circle cx="23" cy="29" r="4.5" fill="#f5b301"/>' +
-  '<circle cx="41" cy="29" r="4.5" fill="#f5b301"/>' +
-  '<path d="M23 39 Q32 45 41 39" stroke="#f5b301" stroke-width="2.5" stroke-linecap="round" fill="none"/>' +
-  '<rect x="24" y="50" width="16" height="6" rx="3" fill="currentColor"/></svg>';
+const AVATAR_EMOJI = '💼';
 
 let supabase = null;
 let session = null;
 let me = null;
 let currentConversationId = null;
 // Modo interno fixo (legado da tabela conversations, que exige um
-// valor válido): o robô interpreta tudo pelo texto do usuário.
+// valor válido): a Secretária interpreta tudo pelo texto do usuário.
 let currentMode = 'foto';
 let currentPaymentId = null;
 let authMode = 'login';
@@ -125,10 +115,10 @@ async function route() {
     $('accessLabel').textContent = planName + ' · válido até ' + until;
     showView('app');
     buildMonthOptions();
-    await loadConversations();
+    if (!currentConversationId) renderWelcome();
     await loadFinanceSummary();
   } else {
-    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com o Robô Financeiro.';
+    $('payHello').textContent = 'Olá, ' + me.user.email + '! Escolha um plano para conversar com a Secretária.';
     $('pixArea').hidden = true;
     showView('pay');
   }
@@ -219,33 +209,6 @@ async function logout() {
 
 // ---------- Conversas ----------
 
-async function loadConversations() {
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('id, mode, title, created_at')
-    .order('created_at', { ascending: false });
-  const list = $('conversationList');
-  list.innerHTML = '';
-  if (error || !data || !data.length) {
-    const p = document.createElement('p');
-    p.className = 'conversation-empty';
-    p.textContent = 'Nenhuma conversa ainda. Comece uma nova!';
-    list.appendChild(p);
-  } else {
-    for (const c of data) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'conversation-item' + (c.id === currentConversationId ? ' active' : '');
-      b.textContent = c.title || 'Nova conversa';
-      b.addEventListener('click', () => openConversation(c.id, c.mode));
-      list.appendChild(b);
-    }
-  }
-  if (!currentConversationId) {
-    renderWelcome();
-  }
-}
-
 async function newConversation(mode) {
   const { data, error } = await supabase
     .from('conversations')
@@ -257,29 +220,8 @@ async function newConversation(mode) {
   currentMode = mode;
   $('messages').innerHTML = '';
   renderWelcome();
-  await loadConversations();
   $('sidebar').classList.remove('open');
   return data.id;
-}
-
-async function openConversation(id, mode) {
-  currentConversationId = id;
-  currentMode = mode || 'foto';
-  const { data } = await supabase
-    .from('messages')
-    .select('role, content, created_at')
-    .eq('conversation_id', id)
-    .order('created_at', { ascending: true });
-  const box = $('messages');
-  box.innerHTML = '';
-  if (!data || !data.length) {
-    renderWelcome();
-  } else {
-    for (const m of data) appendMessage(m.role, m.content);
-  }
-  scrollMessages();
-  await loadConversations();
-  $('sidebar').classList.remove('open');
 }
 
 function renderWelcome() {
@@ -287,8 +229,8 @@ function renderWelcome() {
   const card = document.createElement('div');
   card.className = 'message-row assistant';
   card.innerHTML =
-    '<span class="robot-avatar robot-avatar-sm" aria-hidden="true">' + ROBOT_SVG + '</span>' +
-    '<div class="welcome-card"><h2>Olá! Eu sou o Robô Financeiro 🤖</h2>' +
+    '<span class="assistant-avatar assistant-avatar-sm" aria-hidden="true">' + AVATAR_EMOJI + '</span>' +
+    '<div class="welcome-card"><h2>Olá! Eu sou a Secretária 💼</h2>' +
     '<p>Me conte seus gastos, ganhos, faturas de cartão, contas e dívidas — por exemplo: "Gastei R$ 120 no mercado hoje" ou "Minha fatura do cartão fechou em R$ 850, vence dia 10". Eu registro tudo e lembro da conversa.</p>' +
     '<p>O resumo do mês fica na tela inicial: feche o chat no ✕ para ver os totais atualizados.</p></div>';
   box.appendChild(card);
@@ -301,7 +243,7 @@ function appendMessage(role, content, isError) {
   row.className = 'message-row ' + role;
   if (role === 'assistant') {
     row.innerHTML =
-      '<span class="robot-avatar robot-avatar-sm" aria-hidden="true">' + ROBOT_SVG + '</span>' +
+      '<span class="assistant-avatar assistant-avatar-sm" aria-hidden="true">' + AVATAR_EMOJI + '</span>' +
       '<div class="bubble' + (isError ? ' bubble-error' : '') + '">' + escapeHtml(content) + '</div>';
   } else {
     row.innerHTML = '<div class="bubble">' + escapeHtml(content) + '</div>';
@@ -338,21 +280,6 @@ async function sendMessage(text) {
   sending = true;
   $('sendBtn').disabled = true;
   appendMessage('user', content);
-  // Título da conversa: começo da primeira mensagem do usuário.
-  try {
-    const { data } = await supabase
-      .from('conversations')
-      .select('title')
-      .eq('id', currentConversationId)
-      .single();
-    if (data && data.title === 'Nova conversa') {
-      await supabase
-        .from('conversations')
-        .update({ title: content.slice(0, 40) })
-        .eq('id', currentConversationId);
-      loadConversations();
-    }
-  } catch { /* título é cosmético */ }
 
   // A persistência das mensagens é feita pelo backend (/api/chat),
   // que salva a pergunta e a resposta e carrega o histórico completo.

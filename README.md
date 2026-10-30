@@ -1,12 +1,12 @@
-# Assistente Financeiro — Robô Financeiro
+# Assistente Financeiro — Secretária
 
 Site assistente de **finanças pessoais** em formato de **conversa**: o
-usuário conta seus gastos, ganhos, faturas de cartão, contas e dívidas, o
-Robô Financeiro **registra tudo** no banco, lembra da conversa **inteira**
+usuário conta seus gastos, ganhos, faturas de cartão, contas e dívidas, a
+Secretária **registra tudo** no banco, lembra da conversa **inteira**
 e mostra o **resumo do mês** (ganhos, gastos, faturas de cartão, dívidas
 em aberto e saldo) num painel, com lista de registros e botão de excluir.
 
-O robô organiza e calcula — não promete rentabilidade nem dá
+A Secretária organiza e calcula — não promete rentabilidade nem dá
 recomendação de investimento personalizada; explica conceitos e simula
 cenários de forma educativa.
 
@@ -198,8 +198,8 @@ avulso de gasto/fatura para a mesma compra.
 2. Abra o site, crie uma conta com e-mail e senha.
 3. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
    (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.
-4. Converse com o Robô Financeiro: diga, por exemplo, "Gastei R$ 120 no
-   mercado hoje, registra" — ele confirma o registro e o painel **Resumo
+4. Converse com a Secretária: diga, por exemplo, "Gastei R$ 120 no
+   mercado hoje, registra" — ela confirma o registro e o painel **Resumo
    do mês** mostra o gasto e o saldo atualizados.
 5. Diga "Minha fatura do cartão fechou em R$ 850, vence dia 10" e veja a
    fatura separada no resumo. Use o ✕ para excluir um registro.

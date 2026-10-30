@@ -73,8 +73,9 @@ input, textarea { font: inherit; color: var(--text); }
   font-size: 14px;
 }
 
-/* ---------- Robô (avatar SVG) ---------- */
-.robot-avatar {
+/* ---------- Avatar da assistente ---------- */
+.assistant-avatar {
+  font-size: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -86,13 +87,13 @@ input, textarea { font: inherit; color: var(--text); }
   border: 1px solid var(--border);
   color: #e5e5e5;
 }
-.robot-avatar svg { width: 34px; height: 34px; }
-.robot-avatar-lg { width: 72px; height: 72px; }
-.robot-avatar-lg svg { width: 54px; height: 54px; }
-.robot-avatar-sm { width: 36px; height: 36px; }
-.robot-avatar-sm svg { width: 27px; height: 27px; }
-.robot-avatar-xs { width: 30px; height: 30px; }
-.robot-avatar-xs svg { width: 22px; height: 22px; }
+.assistant-avatar svg { width: 34px; height: 34px; }
+.assistant-avatar-lg { width: 72px; height: 72px; font-size: 40px; }
+.assistant-avatar-lg svg { width: 54px; height: 54px; }
+.assistant-avatar-sm { width: 36px; height: 36px; font-size: 20px; }
+.assistant-avatar-sm svg { width: 27px; height: 27px; }
+.assistant-avatar-xs { width: 30px; height: 30px; font-size: 18px; }
+.assistant-avatar-xs svg { width: 22px; height: 22px; }
 
 /* ---------- Página pública (visão deslogada) ---------- */
 .landing-view {
@@ -292,23 +293,7 @@ input, textarea { font: inherit; color: var(--text); }
 .sidebar-top { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
 .sidebar-brand { font-size: 17px; }
 .sidebar-top .icon-btn { margin-left: auto; display: none; }
-.conversation-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.conversation-item {
-  text-align: left;
-  background: transparent;
-  border: 1px solid transparent;
-  color: #d4d4d4;
-  border-radius: 10px;
-  padding: 9px 10px;
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.conversation-item:hover { background: var(--panel-2); }
-.conversation-item.active { background: var(--panel-2); border-color: var(--border); color: var(--text); }
-.conversation-empty { color: var(--muted); font-size: 13px; padding: 8px 10px; }
-.sidebar-foot { border-top: 1px solid var(--border); padding-top: 12px; }
+.sidebar-foot { margin-top: auto; border-top: 1px solid var(--border); padding-top: 12px; }
 .user-email, .access-label {
   font-size: 13px; color: var(--muted); margin: 2px 4px; word-break: break-all;
 }
