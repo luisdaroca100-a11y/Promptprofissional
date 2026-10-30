@@ -123,7 +123,6 @@ async function route() {
     const until = new Date(me.access.expiresAt).toLocaleDateString('pt-BR');
     const planName = me.access.plan === 'trial' ? 'Teste de 1 dia' : 'Assinatura mensal';
     $('accessLabel').textContent = planName + ' · válido até ' + until;
-    $('usageLabel').textContent = 'Mensagens hoje: ' + me.usage.used + '/' + me.usage.limit;
     showView('app');
     buildMonthOptions();
     await loadConversations();
@@ -366,9 +365,6 @@ async function sendMessage(text) {
     });
     setTyping(false);
     appendMessage('assistant', data.reply);
-    if (data.usage) {
-      $('usageLabel').textContent = 'Mensagens hoje: ' + data.usage.used + '/' + data.usage.limit;
-    }
     // Novo registro salvo: volta o painel para o mês atual e atualiza.
     if (data.finance && data.finance.saved > 0) {
       financeMonth = new Date().toISOString().slice(0, 7);
@@ -445,9 +441,12 @@ async function loadFinanceSummary() {
     $('totalGastos').textContent = formatBRL(t.gastos || 0);
     $('totalFaturas').textContent = formatBRL(t.faturas || 0);
     $('totalDividas').textContent = formatBRL(t.dividas || 0);
+    $('totalParcelas').textContent = formatBRL(t.parcelas || 0);
     $('totalSaldo').textContent = formatBRL(t.saldo || 0);
     $('totalSaldo').classList.toggle('negative', (t.saldo || 0) < 0);
     renderFinanceList(data.entries || []);
+    renderCardList(data.cartoes || []);
+    renderInstallmentList(data.parcelas || []);
   } catch (err) {
     showError($('financeWarning'), err.message || 'Não foi possível carregar o resumo.');
   } finally {
@@ -472,6 +471,7 @@ function renderFinanceList(entries) {
     if (e.cartao) parts.push('cartão ' + e.cartao);
     if (e.vencimento) parts.push('vence ' + formatDateBR(e.vencimento));
     if (e.pago) parts.push('pago');
+    if (e.recorrente) parts.push('🔁 todo mês');
     meta.textContent = parts.join(' · ');
     main.appendChild(desc);
     main.appendChild(meta);
@@ -483,7 +483,7 @@ function renderFinanceList(entries) {
     del.className = 'btn btn-ghost icon-btn finance-delete';
     del.textContent = '✕';
     del.setAttribute('aria-label', 'Excluir registro ' + e.descricao);
-    del.addEventListener('click', () => deleteFinanceEntry(e.id, e.descricao));
+    del.addEventListener('click', () => deleteFinanceItem('entry', e.id, e.descricao));
     li.appendChild(main);
     li.appendChild(value);
     li.appendChild(del);
@@ -491,13 +491,86 @@ function renderFinanceList(entries) {
   }
 }
 
-async function deleteFinanceEntry(id, descricao) {
-  if (!window.confirm('Excluir "' + descricao + '" do resumo?')) return;
+async function deleteFinanceItem(type, id, descricao) {
+  const what = type === 'card' ? 'o cartão' : type === 'installment' ? 'a compra parcelada' : 'o registro';
+  if (!window.confirm('Excluir ' + what + ' "' + descricao + '"?')) return;
   try {
-    await api('/api/finance?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    await api('/api/finance?type=' + encodeURIComponent(type) + '&id=' + encodeURIComponent(id), { method: 'DELETE' });
     await loadFinanceSummary();
   } catch (err) {
     showError($('financeWarning'), err.message);
+  }
+}
+
+function renderCardList(cartoes) {
+  const list = $('cardList');
+  list.innerHTML = '';
+  $('cardEmpty').hidden = cartoes.length > 0;
+  for (const c of cartoes) {
+    const li = document.createElement('li');
+    li.className = 'finance-item card-item' + (c.acimaDoLimite ? ' over-limit' : '');
+    const main = document.createElement('div');
+    main.className = 'finance-item-main';
+    const desc = document.createElement('strong');
+    desc.textContent = '💳 ' + c.nome;
+    const meta = document.createElement('span');
+    const parts = ['Limite ' + formatBRL(c.limite)];
+    if (c.dia_fechamento) parts.push('fecha dia ' + c.dia_fechamento);
+    if (c.dia_vencimento) parts.push('vence dia ' + c.dia_vencimento);
+    parts.push('usado ' + formatBRL(c.usado));
+    meta.textContent = parts.join(' · ');
+    main.appendChild(desc);
+    main.appendChild(meta);
+    const value = document.createElement('strong');
+    value.className = 'finance-item-value' + (c.acimaDoLimite ? ' over-limit-value' : ' positive');
+    value.textContent = c.acimaDoLimite
+      ? formatBRL(Math.abs(c.disponivel)) + ' acima do limite'
+      : 'Disponível ' + formatBRL(c.disponivel);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-ghost icon-btn finance-delete';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Excluir cartão ' + c.nome);
+    del.addEventListener('click', () => deleteFinanceItem('card', c.id, c.nome));
+    li.appendChild(main);
+    li.appendChild(value);
+    li.appendChild(del);
+    list.appendChild(li);
+  }
+}
+
+function renderInstallmentList(parcelas) {
+  const list = $('installmentList');
+  list.innerHTML = '';
+  $('installmentEmpty').hidden = parcelas.length > 0;
+  for (const p of parcelas) {
+    const li = document.createElement('li');
+    li.className = 'finance-item';
+    const main = document.createElement('div');
+    main.className = 'finance-item-main';
+    const desc = document.createElement('strong');
+    desc.textContent = p.descricao;
+    const meta = document.createElement('span');
+    const parts = ['Parcela ' + p.parcela_atual + '/' + p.num_parcelas, formatDateBR(p.data_inicio)];
+    if (p.categoria) parts.push(p.categoria);
+    if (p.cartao) parts.push('cartão ' + p.cartao);
+    parts.push('total ' + formatBRL(p.valor_total));
+    meta.textContent = parts.join(' · ');
+    main.appendChild(desc);
+    main.appendChild(meta);
+    const value = document.createElement('strong');
+    value.className = 'finance-item-value';
+    value.textContent = '− ' + formatBRL(p.valor_parcela);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-ghost icon-btn finance-delete';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Excluir parcela ' + p.descricao);
+    del.addEventListener('click', () => deleteFinanceItem('installment', p.id, p.descricao));
+    li.appendChild(main);
+    li.appendChild(value);
+    li.appendChild(del);
+    list.appendChild(li);
   }
 }
 

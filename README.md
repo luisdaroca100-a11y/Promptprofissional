@@ -30,11 +30,11 @@ está no código.
 index.html                 Frontend: página pública, login, chat, resumo do mês, planos/Pix
 styles.css                 Tema escuro profissional, acento dourado
 app.js                     Lógica do chat, conversas, resumo do mês, pagamento Pix
-api/_lib.js                Helpers (Supabase REST, auth, acesso, uso)
+api/_lib.js                Helpers (Supabase REST, auth, acesso)
 api/config.js              Config pública (URL + anon key do Supabase)
-api/me.js                  Usuário atual + acesso + uso do dia
-api/chat.js                Proxy de IA — Groq (se GROQ_API_KEY existir) com fallback pro Gemini; memória total da conversa; extrai blocos ---REGISTRO--- e salva em finance_entries
-api/finance.js             Resumo do mês (GET) + excluir registro (DELETE)
+api/me.js                  Usuário atual + status de acesso
+api/chat.js                Proxy de IA — Groq (se GROQ_API_KEY existir) com fallback pro Gemini; memória total da conversa; extrai blocos ---REGISTRO---, ---CARTAO--- e ---PARCELA--- e salva em finance_entries, cards e installments
+api/finance.js             Resumo do mês (GET: entradas, cartões, parcelas) + excluir registro/cartão/parcela (DELETE)
 api/mp-create-payment.js   Cria Pix + verifica pagamento já feito
 api/mp-webhook.js          Webhook do Mercado Pago (libera acesso)
 supabase.sql               Schema completo (tabelas + RLS + trigger)
@@ -46,17 +46,20 @@ README.md                  Este arquivo
 O projeto Supabase já existe. Rode o arquivo `supabase.sql` inteiro no
 **SQL Editor** do projeto (Dashboard > SQL Editor > New query > colar > Run).
 
-Ele cria: `profiles`, `user_access`, `usage`, `conversations`, `messages`,
-`processed_payments` e `finance_entries`, com RLS ativado (cada usuário só
-vê os próprios dados) e um trigger que cria o perfil ao cadastrar.
+Ele cria: `profiles`, `user_access`, `usage` (sem uso — o limite diário
+foi removido), `conversations`, `messages`, `processed_payments`,
+`finance_entries`, `cards` e `installments`, com RLS ativado (cada
+usuário só vê os próprios dados) e um trigger que cria o perfil ao
+cadastrar.
 
 > Quem **já rodou** o `supabase.sql` antes precisa rodar **só os trechos
 > finais** marcados `NOVO (Assistente Financeiro)` (cria apenas a tabela
-> `finance_entries`) e `MIGRAÇÃO` (renomeia a coluna do contador de
-> mensagens na tabela `usage`). Sem a tabela nova, o chat avisa que
-> não conseguiu salvar os registros (nada se perde em silêncio) e o painel
-> de resumo mostra o aviso de SQL pendente. Sem a migração, o contador de
-> mensagens segue tratando o uso como 0 até ela ser rodada.
+> `finance_entries`) e `NOVO v2` (cria `cards` e `installments` e a
+> coluna `recorrente` em `finance_entries`). Sem as tabelas novas, o chat
+> avisa que não conseguiu salvar os registros (nada se perde em
+> silêncio) e o painel de resumo mostra o aviso de SQL pendente. O
+> trecho `MIGRAÇÃO` (contador de mensagens) **não precisa mais ser
+> rodado**: o limite diário foi removido e a tabela `usage` ficou sem uso.
 
 > Em **Authentication > Providers**, deixe o provedor **Email** ativado.
 > Em **Authentication > URL Configuration**, ajuste o **Site URL** para o
@@ -76,11 +79,43 @@ vê os próprios dados) e um trigger que cria o perfil ao cadastrar.
 | `cartao` | text/null | nome do cartão (fatura/gasto no cartão) |
 | `vencimento` | date/null | vencimento (fatura/conta/dívida) |
 | `pago` | boolean | padrão `false` |
+| `recorrente` | boolean | `true` = repete todo mês (salário, aluguel); padrão `false` |
 | `created_at` | timestamptz | criação do registro |
 
-O resumo do mês soma: **ganhos** (`ganho`), **gastos** (`gasto` + `conta`),
+### Tabela cards (cartões com limites)
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | gerado automaticamente |
+| `user_id` | uuid | dono do cartão (`auth.users`) |
+| `nome` | text | nome do cartão (único por usuário) |
+| `limite` | numeric(12,2) | limite do cartão em R$ |
+| `dia_fechamento` | int/null | dia do fechamento (1–31) |
+| `dia_vencimento` | int/null | dia do vencimento (1–31) |
+| `created_at` | timestamptz | criação do registro |
+
+### Tabela installments (compras parceladas)
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | gerado automaticamente |
+| `user_id` | uuid | dono da compra (`auth.users`) |
+| `descricao` | text | ex.: "Geladeira" |
+| `valor_total` | numeric(12,2) | valor cheio da compra |
+| `num_parcelas` | int | quantidade de parcelas |
+| `valor_parcela` | numeric(12,2) | valor de cada parcela |
+| `data_inicio` | date | data da primeira parcela |
+| `cartao` | text/null | nome do cartão, se for no cartão |
+| `categoria` | text | ex.: eletrodomésticos |
+| `created_at` | timestamptz | criação do registro |
+
+O resumo do mês soma: **ganhos** (`ganho`, incluindo recorrentes),
+**gastos** (`gasto` + `conta`, incluindo recorrentes, + parcelas do mês),
 **faturas** (`fatura`, separadas para não contar duas vezes) e **dívidas em
 aberto** (`divida` não paga, fora do saldo). Saldo = ganhos − gastos − faturas.
+Parcelas do mês: a compra aparece uma vez por mês, da data de início até
+completar `num_parcelas` (parcela k/N). Usado do cartão = faturas com
+aquele cartão + parcelas do mês naquele cartão; disponível = limite − usado.
 
 ## 2. IA — Groq (teste gratuito) ou Gemini (Google AI Studio)
 
@@ -104,13 +139,16 @@ projeto da chave — o código não muda.
 ### Como o registro funciona
 
 Quando o usuário relata um gasto, ganho, fatura, conta ou dívida, a IA
-emite um bloco `---REGISTRO--- {json} ---END---` no fim da resposta. O
-servidor (`api/chat.js`) extrai o bloco, valida os campos, insere na
-tabela `finance_entries` via service-role key, **remove o bloco JSON da
-resposta visível** e confirma numa frase curta o que foi salvo. Se a
-inserção falhar, a resposta diz claramente que não conseguiu salvar e
-que falta rodar o SQL novo — o registro aparece na mensagem para não se
-perder.
+emite um bloco `---REGISTRO--- {json} ---END---` no fim da resposta;
+limite de cartão vira `---CARTAO--- {json} ---END---` (upsert por nome)
+e compra parcelada vira `---PARCELA--- {json} ---END---`. O servidor
+(`api/chat.js`) extrai os blocos, valida os campos, insere nas tabelas
+via service-role key, **remove os blocos JSON da resposta visível** e
+confirma numa frase curta o que foi salvo. Se a inserção falhar, a
+resposta diz claramente que não conseguiu salvar e que falta rodar o
+SQL novo — o dado aparece na mensagem para não se perder. Regra
+anti-duplicidade: compra parcelada vira SÓ parcela, nunca um registro
+avulso de gasto/fatura para a mesma compra.
 
 ## 3. Mercado Pago (Pix)
 
@@ -155,7 +193,8 @@ perder.
 ## 5. Como testar (fluxo completo)
 
 1. Rode os trechos novos do `supabase.sql` (tabela `finance_entries` +
-   migração do contador de mensagens) no SQL Editor do Supabase.
+   trecho `NOVO v2`: `cards`, `installments` e coluna `recorrente`) no
+   SQL Editor do Supabase.
 2. Abra o site, crie uma conta com e-mail e senha.
 3. A tela de planos aparece: pague o **teste de R$ 1,99** com Pix
    (QR Code ou copia e cola) e toque em **“Já paguei, verificar”**.
@@ -171,8 +210,8 @@ perder.
 
 ## Limites e regras (v1)
 
-- **Limite diário:** 50 mensagens por usuário/dia (constante `DAILY_LIMIT`
-  em `api/chat.js` e `api/me.js`). Ajuste o número nas duas constantes.
+- **Sem limite de mensagens:** o chat é ilimitado para quem tem acesso
+  ativo. Não há contador diário nem bloqueio por uso.
 - **Memória:** o backend envia o histórico completo da conversa à IA
   (Groq ou Gemini) a cada turno (limitado às últimas 200 mensagens por conversa).
 - **Registro:** só é salvo quando a IA emite o bloco `---REGISTRO---`

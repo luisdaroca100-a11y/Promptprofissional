@@ -309,7 +309,7 @@ input, textarea { font: inherit; color: var(--text); }
 .conversation-item.active { background: var(--panel-2); border-color: var(--border); color: var(--text); }
 .conversation-empty { color: var(--muted); font-size: 13px; padding: 8px 10px; }
 .sidebar-foot { border-top: 1px solid var(--border); padding-top: 12px; }
-.user-email, .access-label, .usage-label {
+.user-email, .access-label {
   font-size: 13px; color: var(--muted); margin: 2px 4px; word-break: break-all;
 }
 .access-label { color: var(--gold); }
@@ -504,6 +504,11 @@ body.chat-open .sidebar { z-index: 70; }
 .finance-delete { color: var(--muted); }
 .finance-delete:hover { color: var(--red); }
 .finance-empty { color: var(--muted); font-size: 13.5px; margin: 12px 0 0; }
+.finance-subhead { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; }
+.finance-subhead strong { font-size: 15px; }
+.card-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.card-item.over-limit { border-color: #7a1f1f; }
+.finance-item-value.over-limit-value { color: var(--red); }
 
 /* Mensagens */
 .messages {

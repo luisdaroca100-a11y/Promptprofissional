@@ -49,7 +49,12 @@ async function sbUpsert(path, body) {
     },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error('supabase_upsert_failed');
+  if (!r.ok) {
+    const e = new Error('supabase_upsert_failed');
+    e.status = r.status;
+    try { e.body = await r.text(); } catch (_) { e.body = ''; }
+    throw e;
+  }
   return r.json().catch(() => ({}));
 }
 
@@ -81,47 +86,6 @@ async function getAccess(userId) {
   if (a.status !== 'active') return null;
   if (new Date(a.expires_at).getTime() <= Date.now()) return null;
   return a;
-}
-
-// Contador diário de mensagens (coluna message_count da tabela usage).
-// Robusto à migração pendente: se a coluna nova ainda não existe, a
-// leitura/gravação falha, é registrada no log e o contador é tratado
-// como 0 — o contador nunca pode quebrar o chat.
-async function getUsageToday(userId) {
-  try {
-    const rows = await sbSelect(
-      'usage?user_id=eq.' + encodeURIComponent(userId) +
-      '&day=eq.' + todayISODate() + '&select=message_count'
-    );
-    return rows.length ? rows[0].message_count : 0;
-  } catch (e) {
-    console.error('getUsageToday failed (migration may be pending):', e.message);
-    return 0;
-  }
-}
-
-async function incrementUsage(userId) {
-  const used = await getUsageToday(userId);
-  const day = todayISODate();
-  try {
-    await sbUpsert('usage?on_conflict=user_id,day', {
-      user_id: userId,
-      day,
-      message_count: used + 1,
-    });
-    return;
-  } catch (e) {
-    console.error('incrementUsage upsert failed:', e.message);
-  }
-  try {
-    // Fallback: PATCH direto na linha do dia.
-    await supabaseRest(
-      'usage?user_id=eq.' + encodeURIComponent(userId) + '&day=eq.' + day,
-      { method: 'PATCH', body: { message_count: used + 1 } }
-    );
-  } catch (e) {
-    console.error('incrementUsage patch failed (migration may be pending):', e.message);
-  }
 }
 
 function parseBody(req) {
@@ -185,8 +149,6 @@ module.exports = {
   sbUpsert,
   getUserFromToken,
   getAccess,
-  getUsageToday,
-  incrementUsage,
   parseBody,
   PLANS,
   addDays,

@@ -4,9 +4,12 @@
 -- (Dashboard do projeto > SQL Editor > New query > colar > Run)
 --
 -- Quem JÁ rodou este arquivo antes: rode SÓ os trechos finais marcados
--- "NOVO (Assistente Financeiro)" e "MIGRAÇÃO" — o primeiro só cria a
--- tabela finance_entries e o segundo só renomeia a coluna do contador
--- de mensagens (o resto usa "if not exists" e não muda nada).
+-- "NOVO (Assistente Financeiro)" e "NOVO v2" — o primeiro só cria a
+-- tabela finance_entries e o segundo só cria as tabelas cards e
+-- installments e a coluna recorrente (o resto usa "if not exists" e
+-- não muda nada). O trecho "MIGRAÇÃO" (contador de mensagens) NÃO
+-- precisa mais ser rodado: o limite diário foi removido e a tabela
+-- `usage` ficou sem uso.
 --
 -- Variáveis de ambiente que o app precisa na Vercel:
 --   SUPABASE_URL           (URL do projeto — Settings > API)
@@ -225,5 +228,97 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = 'usage' AND column_name = 'message_count'
   ) THEN
     ALTER TABLE public.usage RENAME COLUMN prompt_count TO message_count;
+  END IF;
+END $$;
+
+-- ============================================================
+-- NOVO v2 (cartões, parcelas e recorrência, 2026-10-29)
+-- RODE SÓ ESTE TRECHO se você já rodou este arquivo antes.
+-- Idempotente: pode rodar 2x sem erro. Cria as tabelas cards
+-- (cartões com limites) e installments (compras parceladas) com
+-- suas políticas, e adiciona a coluna recorrente em finance_entries
+-- (ganho/gasto que se repete todo mês). Sem este trecho, o chat
+-- avisa que não conseguiu salvar cartões/parcelas e o resumo não
+-- mostra limites nem parcelas.
+-- ============================================================
+
+create table if not exists public.cards (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  nome text not null,
+  limite numeric(12, 2) not null,
+  dia_fechamento int,
+  dia_vencimento int,
+  created_at timestamptz not null default now(),
+  constraint cards_user_nome_unique unique (user_id, nome)
+);
+
+create table if not exists public.installments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  descricao text not null,
+  valor_total numeric(12, 2) not null,
+  num_parcelas int not null,
+  valor_parcela numeric(12, 2) not null,
+  data_inicio date not null,
+  cartao text,
+  categoria text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.cards enable row level security;
+alter table public.installments enable row level security;
+
+-- cards: CRUD só dos próprios cartões
+drop policy if exists "cards_select_own" on public.cards;
+create policy "cards_select_own" on public.cards
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "cards_insert_own" on public.cards;
+create policy "cards_insert_own" on public.cards
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "cards_update_own" on public.cards;
+create policy "cards_update_own" on public.cards
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "cards_delete_own" on public.cards;
+create policy "cards_delete_own" on public.cards
+  for delete using (auth.uid() = user_id);
+
+-- installments: CRUD só das próprias parcelas
+drop policy if exists "installments_select_own" on public.installments;
+create policy "installments_select_own" on public.installments
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "installments_insert_own" on public.installments;
+create policy "installments_insert_own" on public.installments
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "installments_update_own" on public.installments;
+create policy "installments_update_own" on public.installments
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "installments_delete_own" on public.installments;
+create policy "installments_delete_own" on public.installments
+  for delete using (auth.uid() = user_id);
+
+create index if not exists idx_cards_user
+  on public.cards (user_id);
+create index if not exists idx_installments_user_inicio
+  on public.installments (user_id, data_inicio);
+
+-- Coluna recorrente em finance_entries (só adiciona se a tabela
+-- existir e a coluna ainda não existir).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'finance_entries'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'finance_entries' AND column_name = 'recorrente'
+  ) THEN
+    ALTER TABLE public.finance_entries ADD COLUMN recorrente boolean not null default false;
   END IF;
 END $$;

@@ -283,7 +283,6 @@
     <div class="sidebar-foot">
       <p id="userEmailLabel" class="user-email"></p>
       <p id="accessLabel" class="access-label"></p>
-      <p id="usageLabel" class="usage-label"></p>
       <button id="logoutBtn" class="btn btn-ghost btn-block" type="button">Sair</button>
     </div>
   </aside>
@@ -324,10 +323,19 @@
         <div class="finance-total"><span>Gastos</span><strong id="totalGastos">R$ 0,00</strong></div>
         <div class="finance-total"><span>Faturas de cartão</span><strong id="totalFaturas">R$ 0,00</strong></div>
         <div class="finance-total"><span>Dívidas em aberto</span><strong id="totalDividas">R$ 0,00</strong></div>
+        <div class="finance-total"><span>Parcelas do mês</span><strong id="totalParcelas">R$ 0,00</strong></div>
         <div class="finance-total finance-saldo"><span>Saldo do mês</span><strong id="totalSaldo">R$ 0,00</strong></div>
       </div>
       <ul id="financeList" class="finance-list"></ul>
       <p id="financeEmpty" class="finance-empty">Nenhum registro neste mês ainda. Conte ao Robô Financeiro, por exemplo: "Gastei R$ 120 no mercado hoje."</p>
+
+      <div class="finance-subhead"><strong>Cartões e limites</strong></div>
+      <ul id="cardList" class="card-list"></ul>
+      <p id="cardEmpty" class="finance-empty">Nenhum cartão com limite salvo. Fale no chat, por exemplo: "Meu cartão Nubank tem limite de R$ 5.000".</p>
+
+      <div class="finance-subhead"><strong>Parcelas do mês</strong></div>
+      <ul id="installmentList" class="finance-list"></ul>
+      <p id="installmentEmpty" class="finance-empty">Nenhuma parcela neste mês. Compras parceladas aparecem aqui, uma parcela por mês.</p>
     </section>
     <p class="summary-hint">Toque no botão abaixo para falar com o Robô Financeiro: ele registra seus gastos e faturas e atualiza este resumo.</p>
   </main>

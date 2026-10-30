@@ -4,29 +4,29 @@
 //
 // Body: { conversationId: string, message: string }
 // - Verifica o login (token Supabase) e o acesso ativo.
-// - Enforça o limite diário de mensagens.
+// - NÃO há limite de mensagens: o chat é ilimitado para quem tem
+//   acesso ativo (só o acesso é verificado, nunca um contador).
 // - Carrega TODAS as mensagens da conversa no banco e envia o
 //   histórico completo à IA a cada turno (é isso que faz o
 //   assistente "lembrar da conversa inteira").
-// - Quando a IA emite um bloco ---REGISTRO---, o servidor extrai o
-//   bloco, salva o registro na tabela finance_entries, REMOVE o bloco
-//   da resposta visível e confirma o que foi salvo. Se a tabela ainda
-//   não existir (SQL novo não rodado), a resposta avisa com clareza —
-//   o registro nunca se perde em silêncio.
-// - Salva a resposta no banco e conta o uso somente após sucesso.
+// - Quando a IA emite um bloco ---REGISTRO---, ---CARTAO--- ou
+//   ---PARCELA---, o servidor extrai o bloco, salva os dados nas
+//   tabelas (finance_entries, cards, installments), REMOVE o bloco
+//   da resposta visível e confirma o que foi salvo. Se alguma tabela
+//   ainda não existir (SQL novo não rodado), a resposta avisa com
+//   clareza — o registro nunca se perde em silêncio.
+// - Salva a resposta no banco após o sucesso.
 
 const {
   json,
   parseBody,
   getUserFromToken,
   getAccess,
-  getUsageToday,
-  incrementUsage,
   supabaseRest,
   sbSelect,
+  sbUpsert,
 } = require('./_lib');
 
-const DAILY_LIMIT = 50;
 const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
@@ -45,7 +45,7 @@ function systemInstruction() {
     'Você é o Robô Financeiro, um assistente de finanças pessoais que conversa em português. ' +
     'Hoje é ' + today + '. ' +
     'O usuário quer organizar as finanças pessoais: gastos mensais, faturas de cartão, contas, dívidas e orçamento. ' +
-    'O que você faz: ajuda a registrar gastos, ganhos, faturas de cartão, contas e dívidas; calcula totais e mostra o resumo do mês; ajuda a montar e acompanhar um orçamento; explica conceitos de finanças de forma simples e pode simular cenários ("e se eu gastar X a menos...?"). ' +
+    'O que você faz: ajuda a registrar gastos, ganhos, faturas de cartão, contas, dívidas, cartões com limites e compras parceladas; calcula totais e mostra o resumo do mês; ajuda a montar e acompanhar um orçamento; explica conceitos de finanças de forma simples e pode simular cenários ("e se eu gastar X a menos...?"). ' +
     'Regras obrigatórias: ' +
     '1) Faça no máximo UMA pergunta de esclarecimento por vez quando faltar informação importante — nunca faça várias perguntas de uma vez. ' +
     '2) NUNCA repita a mesma pergunta: se o usuário não responder, responder pela metade ou mudar de assunto, NÃO pergunte de novo. Siga em frente assumindo um valor padrão razoável para o que faltava, avise em UMA frase curta o que assumiu (ex.: "vou assumir que foi hoje") e continue. Perguntar duas vezes a mesma coisa é proibido. ' +
@@ -54,16 +54,26 @@ function systemInstruction() {
     '5) Se o usuário pedir para registrar ("registra", "anota aí", "tá bom", "pode anotar" ou confirmar um valor), registre NA HORA com as informações que já tem, sem fazer mais nenhuma pergunta. ' +
     '6) Dinheiro sempre em R$ (real), com formato pt-BR (ex.: R$ 1.234,56). Ao falar de datas com o usuário, use dia/mês/ano. ' +
     '7) Você organiza e calcula — não promete rentabilidade e não dá recomendação de investimento personalizada. Pode explicar conceitos e comparar cenários de forma educativa. ' +
+    '8) Recorrência: quando o usuário informar um ganho, gasto ou conta que se repete TODO mês (ex.: "meu salário é R$ 3.000 todo mês", "o aluguel é R$ 1.200 por mês"), registre com "recorrente":true — ele passa a contar em todos os meses a partir daquele mês. Todo o resto usa "recorrente":false. ' +
+    '9) REGRA ANTI-DUPLICIDADE, obrigatória: compra parcelada vira SÓ uma parcela — NUNCA crie também um registro avulso de gasto ou fatura para a mesma compra. E fatura de cartão NÃO vira gasto: a fatura fica separada no resumo, para não contar duas vezes. ' +
+    '10) Cartões e limites: quando o usuário informar ou mudar o limite de um cartão ("meu cartão X tem limite de R$ 5.000", "aumentou o limite do X pra 7 mil"), emita o bloco ---CARTAO---. Quando informar uma compra parcelada, emita o bloco ---PARCELA--- (e nenhum REGISTRO para ela). ' +
     'Quando o usuário relatar um gasto, ganho, fatura, conta ou dívida, emita o registro em um bloco EXATAMENTE neste formato, no fim da resposta, um bloco por item: ' +
-    '---REGISTRO--- {"tipo":"gasto|ganho|fatura|conta|divida","descricao":"...","valor":123.45,"categoria":"...","data":"YYYY-MM-DD","cartao":null|"nome do cartão","vencimento":null|"YYYY-MM-DD","pago":false} ---END--- ' +
+    '---REGISTRO--- {"tipo":"gasto|ganho|fatura|conta|divida","descricao":"...","valor":123.45,"categoria":"...","data":"YYYY-MM-DD","cartao":null|"nome do cartão","vencimento":null|"YYYY-MM-DD","pago":false,"recorrente":false} ---END--- ' +
     '"tipo": gasto (compra ou pagamento avulso), ganho (salário, renda, entrada), fatura (total da fatura do cartão), conta (conta fixa ou recorrente: aluguel, luz, internet), divida (valor devido ou parcela). ' +
     '"valor": número, com ponto decimal, sem R$ e sem texto. ' +
     '"data": data do gasto ou ganho (YYYY-MM-DD); se o usuário não disser, use a data de hoje. ' +
     '"cartao": só para fatura ou gasto no cartão — o nome do cartão; senão null. ' +
     '"vencimento": só para fatura, conta ou dívida com vencimento — YYYY-MM-DD; senão null. ' +
     '"pago": true só se o usuário disser que já pagou; senão false. ' +
+    '"recorrente": true só para ganho, gasto ou conta que se repete todo mês; senão false. ' +
     '"categoria": curta, ex.: mercado, moradia, transporte, lazer, saúde, assinaturas, cartão. ' +
-    'O texto visível da resposta deve ser curto (uma frase) e NÃO deve repetir o JSON. O bloco é removido antes de aparecer para o usuário.'
+    'Bloco de cartão (um por cartão, no fim da resposta): ' +
+    '---CARTAO--- {"nome":"...","limite":5000,"dia_fechamento":null,"dia_vencimento":10} ---END--- ' +
+    '"nome": nome do cartão; "limite": número, com ponto decimal, sem R$; "dia_fechamento" e "dia_vencimento": dia do mês (1 a 31) ou null quando o usuário não disser. ' +
+    'Bloco de parcela (um por compra parcelada, no fim da resposta): ' +
+    '---PARCELA--- {"descricao":"...","valor_total":1200,"num_parcelas":10,"valor_parcela":120,"data_inicio":"YYYY-MM-DD","cartao":null|"nome do cartão","categoria":"..."} ---END--- ' +
+    '"valor_total": valor cheio da compra; "num_parcelas": quantidade de parcelas; "valor_parcela": valor de cada parcela (valor_total dividido por num_parcelas, quando o usuário não disser); "data_inicio": data da primeira parcela (se não disser, hoje). ' +
+    'O texto visível da resposta deve ser curto (uma frase) e NÃO deve repetir o JSON. Os blocos são removidos antes de aparecer para o usuário.'
   );
 }
 
@@ -205,9 +215,11 @@ async function callGroq(apiKey, history) {
   throw new Error('groq_error');
 }
 
-// ---------- Registros financeiros (blocos ---REGISTRO---) ----------
+// ---------- Registros financeiros (blocos ---REGISTRO--- / ---CARTAO--- / ---PARCELA---) ----------
 
 const REGISTRO_RE = /---REGISTRO---\s*([\s\S]*?)\s*---END---/g;
+const CARTAO_RE = /---CARTAO---\s*([\s\S]*?)\s*---END---/g;
+const PARCELA_RE = /---PARCELA---\s*([\s\S]*?)\s*---END---/g;
 const TIPOS_VALIDOS = new Set(['gasto', 'ganho', 'fatura', 'conta', 'divida']);
 
 function isValidDate(s) {
@@ -230,7 +242,30 @@ function describeRegistro(r) {
   if (r.cartao) s += ' · cartão ' + r.cartao;
   if (r.vencimento) s += ' · vence ' + formatDateBR(r.vencimento);
   if (r.pago) s += ' · pago';
+  if (r.recorrente) s += ' · todo mês';
   return s;
+}
+
+function describeCartao(c) {
+  let s = 'Limite do cartão ' + c.nome + ' atualizado: ' + formatBRL(c.limite) + '.';
+  const bits = [];
+  if (c.dia_fechamento) bits.push('fecha dia ' + c.dia_fechamento);
+  if (c.dia_vencimento) bits.push('vence dia ' + c.dia_vencimento);
+  if (bits.length) s += ' (' + bits.join(', ') + ')';
+  return s;
+}
+
+function describeParcela(p) {
+  let s = 'Parcela registrada: ' + p.descricao + ' — ' + p.num_parcelas + 'x de ' + formatBRL(p.valor_parcela) +
+    ' (' + formatBRL(p.valor_total) + ' no total), a partir de ' + formatDateBR(p.data_inicio);
+  if (p.cartao) s += ' · cartão ' + p.cartao;
+  return s + '.';
+}
+
+function validDay(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 31) return null;
+  return n;
 }
 
 // Valida e normaliza um registro vindo do bloco JSON.
@@ -259,6 +294,50 @@ function normalizeRegistro(raw) {
     cartao,
     vencimento,
     pago: raw.pago === true,
+    recorrente: raw.recorrente === true,
+  };
+}
+
+function normalizeCartao(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const nome = String(raw.nome || '').trim().slice(0, 60);
+  if (!nome) return null;
+  const limite = Number(raw.limite);
+  if (!Number.isFinite(limite) || limite <= 0) return null;
+  return {
+    nome,
+    limite: Math.round(limite * 100) / 100,
+    dia_fechamento: validDay(raw.dia_fechamento),
+    dia_vencimento: validDay(raw.dia_vencimento),
+  };
+}
+
+function normalizeParcela(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const descricao = String(raw.descricao || '').trim().slice(0, 200);
+  if (!descricao) return null;
+  const valorTotal = Number(raw.valor_total);
+  if (!Number.isFinite(valorTotal) || valorTotal <= 0) return null;
+  const numParcelas = Number(raw.num_parcelas);
+  if (!Number.isInteger(numParcelas) || numParcelas < 1) return null;
+  let valorParcela = Number(raw.valor_parcela);
+  if (!Number.isFinite(valorParcela) || valorParcela <= 0) {
+    valorParcela = Math.round((valorTotal / numParcelas) * 100) / 100;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const dataInicio = isValidDate(raw.data_inicio) ? raw.data_inicio : today;
+  const cartao = raw.cartao === null || raw.cartao === undefined
+    ? null
+    : String(raw.cartao).trim().slice(0, 60) || null;
+  const categoria = String(raw.categoria || '').trim().slice(0, 60) || 'outros';
+  return {
+    descricao,
+    valor_total: Math.round(valorTotal * 100) / 100,
+    num_parcelas: numParcelas,
+    valor_parcela: Math.round(valorParcela * 100) / 100,
+    data_inicio: dataInicio,
+    cartao,
+    categoria,
   };
 }
 
@@ -266,7 +345,13 @@ function isMissingTable(status, text) {
   return status === 404 || /PGRST205|42P01|does not exist|Could not find the table/i.test(text || '');
 }
 
+function isMissingColumn(text) {
+  return /PGRST204|42703|column .* does not exist/i.test(text || '');
+}
+
 // Insere um registro. Retorna { ok: true } ou { ok: false, missingTable }.
+// Se a coluna `recorrente` ainda não existe (SQL novo não rodado), salva
+// sem ela e avisa (recorrenteDropped) em vez de perder o registro.
 async function insertRegistro(userId, registro) {
   const r = await supabaseRest('finance_entries', {
     method: 'POST',
@@ -275,71 +360,167 @@ async function insertRegistro(userId, registro) {
   if (r.ok) return { ok: true };
   let text = '';
   try { text = (await r.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
+  if (/recorrente/i.test(text) && isMissingColumn(text)) {
+    const { recorrente, ...semRecorrente } = registro; // eslint-disable-line no-unused-vars
+    const r2 = await supabaseRest('finance_entries', {
+      method: 'POST',
+      body: { user_id: userId, ...semRecorrente },
+    });
+    if (r2.ok) return { ok: true, recorrenteDropped: true };
+    let text2 = '';
+    try { text2 = (await r2.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
+    console.error('finance_entries insert failed', r2.status, text2);
+    return { ok: false, missingTable: isMissingTable(r2.status, text2) };
+  }
   console.error('finance_entries insert failed', r.status, text);
   return { ok: false, missingTable: isMissingTable(r.status, text) };
 }
 
-// Extrai os blocos ---REGISTRO--- da resposta, salva cada um e devolve
-// a resposta visível (sem os blocos) + o resumo do que foi salvo.
-// Nunca perde um registro em silêncio: falha de gravação vira aviso
-// claro na própria resposta, com os dados do registro à mostra.
-async function processRegistros(userId, reply) {
+// Cria ou atualiza o cartão pelo nome (um cartão por nome, por usuário).
+// A tabela cards tem unique(user_id, nome), então o upsert por
+// on_conflict funde duplicados em vez de criar outro cartão.
+async function upsertCartao(userId, cartao) {
+  try {
+    await sbUpsert('cards?on_conflict=user_id,nome', { user_id: userId, ...cartao });
+    return { ok: true };
+  } catch (e) {
+    console.error('cards upsert failed', e.status, e.body);
+    return { ok: false, missingTable: isMissingTable(e.status || 0, e.body || '') };
+  }
+}
+
+async function insertParcela(userId, parcela) {
+  const r = await supabaseRest('installments', {
+    method: 'POST',
+    body: { user_id: userId, ...parcela },
+  });
+  if (r.ok) return { ok: true };
+  let text = '';
+  try { text = (await r.text()).slice(0, 500); } catch (_) { /* sem corpo */ }
+  console.error('installments insert failed', r.status, text);
+  return { ok: false, missingTable: isMissingTable(r.status, text) };
+}
+
+function extractBlocks(reply, re) {
+  const blocks = [];
+  let m;
+  re.lastIndex = 0;
+  while ((m = re.exec(reply)) !== null) blocks.push(m[1]);
+  return blocks;
+}
+
+// Extrai os blocos ---REGISTRO--- / ---CARTAO--- / ---PARCELA--- da
+// resposta, salva cada um e devolve a resposta visível (sem os blocos)
+// + o resumo do que foi salvo. Nunca perde um dado em silêncio: falha
+// de gravação vira aviso claro na própria resposta, com os dados à mostra.
+async function processBlocks(userId, reply) {
   let visible = reply;
-  const saved = [];
+  const notes = [];
+  let savedCount = 0;
   let failed = false;
   let needsSql = false;
 
-  const blocks = [];
-  let m;
-  REGISTRO_RE.lastIndex = 0;
-  while ((m = REGISTRO_RE.exec(reply)) !== null) blocks.push(m[1]);
-  visible = reply.replace(REGISTRO_RE, '').trim();
+  const registroBlocks = extractBlocks(reply, REGISTRO_RE);
+  const cartaoBlocks = extractBlocks(reply, CARTAO_RE);
+  const parcelaBlocks = extractBlocks(reply, PARCELA_RE);
+  visible = reply
+    .replace(REGISTRO_RE, '')
+    .replace(CARTAO_RE, '')
+    .replace(PARCELA_RE, '')
+    .trim();
   // Bloco aberto sem ---END---: remove o resto para o JSON não vazar
-  // para o usuário e trata como registro não entendido.
-  const strayIdx = visible.indexOf('---REGISTRO---');
+  // para o usuário e trata como dado não entendido.
+  const strayIdx = Math.min(
+    ...['---REGISTRO---', '---CARTAO---', '---PARCELA---'].map((marker) => {
+      const i = visible.indexOf(marker);
+      return i === -1 ? Infinity : i;
+    })
+  );
   let strayBlock = false;
-  if (strayIdx !== -1) {
+  if (strayIdx !== Infinity) {
     visible = visible.slice(0, strayIdx).trim();
     strayBlock = true;
   }
 
-  for (const raw of blocks) {
+  const totalBlocks = registroBlocks.length + cartaoBlocks.length + parcelaBlocks.length;
+
+  for (const raw of registroBlocks) {
     let parsed = null;
     try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
     const registro = normalizeRegistro(parsed);
-    if (!registro) {
-      failed = true;
-      continue;
-    }
+    if (!registro) { failed = true; continue; }
     const result = await insertRegistro(userId, registro);
     if (result.ok) {
-      saved.push(registro);
+      savedCount += 1;
+      notes.push('Registrado: ' + describeRegistro(registro) + '.');
+      if (result.recorrenteDropped) {
+        needsSql = true;
+        notes.push('Atenção: salvei o registro, mas a recorrência (todo mês) só passa a valer depois de rodar o SQL novo no Supabase — falta a coluna nova na tabela.');
+      }
     } else {
       failed = true;
-      if (result.missingTable) needsSql = true;
-      saved.push({ ...registro, _failed: true, _missingTable: !!result.missingTable });
+      if (result.missingTable) {
+        needsSql = true;
+        notes.push(
+          'Não consegui salvar este registro no banco: a tabela nova (finance_entries) ainda não existe no Supabase — ' +
+          'falta rodar o SQL novo (trecho "NOVO (Assistente Financeiro)" do arquivo supabase.sql) no SQL Editor e tente de novo. O registro era: ' + describeRegistro(registro) + '.'
+        );
+      } else {
+        notes.push(
+          'Não consegui salvar este registro agora (erro no banco). Tente de novo. O registro era: ' + describeRegistro(registro) + '.'
+        );
+      }
     }
   }
 
-  const notes = [];
-  for (const r of saved) {
-    if (r._failed && r._missingTable) {
-      notes.push(
-        'Não consegui salvar este registro no banco: a tabela nova (finance_entries) ainda não existe no Supabase — ' +
-        'falta rodar o SQL novo (trecho "NOVO (Assistente Financeiro)" do arquivo supabase.sql) no SQL Editor e tente de novo. O registro era: ' + describeRegistro(r) + '.'
-      );
-    } else if (r._failed) {
-      notes.push(
-        'Não consegui salvar este registro agora (erro no banco). Tente de novo. O registro era: ' + describeRegistro(r) + '.'
-      );
+  for (const raw of cartaoBlocks) {
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
+    const cartao = normalizeCartao(parsed);
+    if (!cartao) { failed = true; continue; }
+    const result = await upsertCartao(userId, cartao);
+    if (result.ok) {
+      savedCount += 1;
+      notes.push(describeCartao(cartao));
     } else {
-      notes.push('Registrado: ' + describeRegistro(r) + '.');
+      failed = true;
+      if (result.missingTable) {
+        needsSql = true;
+        notes.push(
+          'Não consegui salvar o cartão ' + cartao.nome + ' (limite ' + formatBRL(cartao.limite) + '): falta rodar o SQL novo das tabelas cards/installments no Supabase (trecho "NOVO v2" do arquivo supabase.sql).'
+        );
+      } else {
+        notes.push('Não consegui salvar o cartão ' + cartao.nome + ' agora (erro no banco). Tente de novo.');
+      }
     }
   }
-  if (strayBlock || (blocks.length && failed && !saved.length)) {
+
+  for (const raw of parcelaBlocks) {
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
+    const parcela = normalizeParcela(parsed);
+    if (!parcela) { failed = true; continue; }
+    const result = await insertParcela(userId, parcela);
+    if (result.ok) {
+      savedCount += 1;
+      notes.push(describeParcela(parcela));
+    } else {
+      failed = true;
+      if (result.missingTable) {
+        needsSql = true;
+        notes.push(
+          'Não consegui salvar esta parcela (' + describeParcela(parcela) + '): falta rodar o SQL novo das tabelas cards/installments no Supabase (trecho "NOVO v2" do arquivo supabase.sql).'
+        );
+      } else {
+        notes.push('Não consegui salvar esta parcela agora (erro no banco). Tente de novo. Era: ' + describeParcela(parcela));
+      }
+    }
+  }
+
+  if (strayBlock || (totalBlocks && failed && savedCount === 0)) {
     notes.push('Não consegui entender os dados de um registro (vieram incompletos). Pode me falar de novo o valor e a descrição?');
-  } else if (failed && blocks.length && saved.some((r) => !r._failed)) {
-    notes.push('Um dos registros veio com dados incompletos e não foi salvo. Pode me falar de novo o valor e a descrição?');
+  } else if (failed && totalBlocks && savedCount > 0) {
+    notes.push('Um dos dados veio incompleto e não foi salvo. Pode me falar de novo o valor e a descrição?');
   }
 
   if (notes.length) {
@@ -347,7 +528,7 @@ async function processRegistros(userId, reply) {
   }
   return {
     visible: visible.trim(),
-    savedCount: saved.filter((r) => !r._failed).length,
+    savedCount,
     failed,
     needsSql,
   };
@@ -372,12 +553,6 @@ module.exports = async function handler(req, res) {
       return json(res, 402, {
         error: 'Você não tem acesso ativo. Ative o teste de 1 dia por R$ 1,99 ou a assinatura de R$ 19,90/mês.',
         needsAccess: true,
-      });
-    }
-    const used = await getUsageToday(user.id);
-    if (used >= DAILY_LIMIT) {
-      return json(res, 429, {
-        error: 'Você atingiu o limite de ' + DAILY_LIMIT + ' mensagens de hoje. Volte amanhã.',
       });
     }
 
@@ -437,17 +612,15 @@ module.exports = async function handler(req, res) {
       return json(res, 502, { error: 'A IA não respondeu agora. Tente de novo em alguns segundos.' });
     }
 
-    // Registros financeiros: extrai, salva e limpa a resposta visível.
-    const processed = await processRegistros(user.id, reply);
+    // Blocos financeiros: extrai, salva e limpa a resposta visível.
+    const processed = await processBlocks(user.id, reply);
     const visibleReply = processed.visible || reply;
 
-    // Salva a resposta (visível, sem os blocos JSON) e conta o uso
-    // (só após sucesso).
+    // Salva a resposta (visível, sem os blocos JSON) após o sucesso.
     await supabaseRest('messages', {
       method: 'POST',
       body: { conversation_id: conversationId, role: 'assistant', content: visibleReply },
     });
-    await incrementUsage(user.id);
 
     return json(res, 200, {
       reply: visibleReply,
@@ -457,7 +630,6 @@ module.exports = async function handler(req, res) {
         failed: processed.failed,
         needsSql: processed.needsSql,
       },
-      usage: { used: used + 1, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - used - 1) },
     });
   } catch (err) {
     if (err && err.message === 'supabase_env_missing') {

@@ -1,9 +1,9 @@
 'use strict';
-// GET /api/me — usuário atual + status de acesso + uso do dia.
+// GET /api/me — usuário atual + status de acesso.
 // Exige Authorization: Bearer <token do Supabase Auth>.
-const { json, getUserFromToken, getAccess, getUsageToday } = require('./_lib');
-
-const DAILY_LIMIT = 50;
+// Não há limite de mensagens: o chat é ilimitado para quem tem
+// acesso ativo (só o acesso — trial/assinatura — é verificado).
+const { json, getUserFromToken, getAccess } = require('./_lib');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -15,13 +15,11 @@ module.exports = async function handler(req, res) {
       return json(res, 401, { error: 'Você não está logado. Faça login para continuar.' });
     }
     const access = await getAccess(user.id);
-    const used = await getUsageToday(user.id);
     return json(res, 200, {
       user: { id: user.id, email: user.email },
       access: access
         ? { active: true, plan: access.plan, expiresAt: access.expires_at }
         : { active: false, plan: null, expiresAt: null },
-      usage: { used, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - used) },
     });
   } catch (err) {
     if (err && err.message === 'supabase_env_missing') {
